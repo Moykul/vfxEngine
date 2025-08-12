@@ -1,0 +1,15 @@
+{
+  "particleCount": 500,
+  "animationDuration": 2,
+  "particleSize": 1,
+  "spreadRadius": 2,
+  "color": "#a3ff30",
+  "opacity": 0.5,
+  "blendMode": "Additive",
+  "sizeVariation": 0.8,
+  "timeVariation": 0.8,
+  "shape": "explosion",
+  "shapeHeight": 2,
+  "shapeAngle": 0,
+  "heightMultiplier": 0.19999999999999996
+}
