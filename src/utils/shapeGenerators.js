@@ -267,6 +267,14 @@ export const generateWave = (count, radius, height, angle, heightMultiplier = 1,
 };
 
 /**
+ * Generate a simple mesh for flow field particles
+ */
+export const generateFlowFieldMesh = (count, radius = 1, subdivisions = 30) => {
+  const geometry = new THREE.BoxGeometry(radius * 2, radius * 2, radius * 2, subdivisions, subdivisions, subdivisions);
+  return geometry;
+};
+
+/**
  * Main function to generate positions based on shape type
  */
 export const generatePositions = (shape, count, radius, height = 2, angle = 0, heightMultiplier = 1, options = {}) => {
@@ -295,6 +303,9 @@ export const generatePositions = (shape, count, radius, height = 2, angle = 0, h
       return generateSpiral(count, radius, height, heightMultiplier, turns, reverse);
     case 'wave':
       return generateWave(count, radius, height, angle, heightMultiplier, frequency, amplitude);
+    case 'flowfield':
+      // For flow field, we generate a simple mesh positions but they'll be handled by FlowFieldParticles
+      return generateSphere(count, radius, heightMultiplier, false);
     default:
       console.warn(`Unknown shape: ${shape}, falling back to explosion`);
       return generateExplosion(count, radius);
@@ -307,7 +318,7 @@ export const generatePositions = (shape, count, radius, height = 2, angle = 0, h
 export const getAvailableShapes = () => {
   return [
     'explosion', 'sphere', 'box', 'cone', 'circle', 
-    'square', 'spiral', 'wave'
+    'square', 'spiral', 'wave', 'flowfield'
   ];
 };
 

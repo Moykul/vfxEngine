@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useFrame, useThree, extend } from '@react-three/fiber';
 import { shaderMaterial } from '@react-three/drei';
 import * as THREE from 'three';
-import { generatePositions } from '../../utils/shapeGenerators.js';
+import { generatePositions, generateFlowFieldMesh } from '../../utils/shapeGenerators.js';
 import { useVfxTextures } from '../../hooks/index.js';
 import { FIXED_VFX_SETTINGS } from './VfxParameters.js';
+import { FlowFieldParticles } from './FlowFieldParticles.jsx';
 
 // Import shaders
 import vfxVertexShader from '../../shaders/vfxShaders/vertex.glsl';
@@ -259,6 +260,43 @@ const VfxEngine = ({
     }
   };
 
+  // Render flow field effect if shape is 'flowfield'
+  if (effectiveValues.shape === 'flowfield') {
+    const flowFieldMesh = useMemo(() => {
+      return generateFlowFieldMesh(effectiveValues.pCount || 800, effectiveValues.spread || 2);
+    }, [effectiveValues.pCount, effectiveValues.spread]);
+
+    return (
+      <group 
+        position={[effectiveValues.positionX || 0, effectiveValues.positionY || 0, effectiveValues.positionZ || 0]} 
+        scale={[effectiveValues.scale || 1, effectiveValues.scale || 1, effectiveValues.scale || 1]} 
+        rotation={[
+          (effectiveValues.rotationX || 0) * Math.PI / 180, 
+          (effectiveValues.rotationY || 0) * Math.PI / 180, 
+          (effectiveValues.rotationZ || 0) * Math.PI / 180
+        ]}
+      >
+        <FlowFieldParticles
+          name="VFXFlowField"
+          debug={false}
+          interactive={effectiveValues.flowFieldInteractive}
+          childMeshVisible={false}
+          size={effectiveValues.pSize || 0.1}
+          colors={[effectiveValues.color || '#9eff30', effectiveValues.colorEnd || '#00eeff']}
+          disturbIntensity={effectiveValues.flowFieldStrength || 0.3}
+          repulsionForce={effectiveValues.flowFieldRepulsion || 1.0}
+          shape={effectiveValues.flowFieldShape || 'disc'}
+          lightSource={null}
+        >
+          <mesh geometry={flowFieldMesh}>
+            <meshBasicMaterial color={effectiveValues.color || '#9eff30'} transparent opacity={0.1} />
+          </mesh>
+        </FlowFieldParticles>
+      </group>
+    );
+  }
+
+  // Standard VFX rendering for other shapes
   return (
     <points 
       ref={meshRef}
