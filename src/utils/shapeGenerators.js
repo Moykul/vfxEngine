@@ -1,19 +1,161 @@
 /**
- * Stores all shapes for vfx.
+ * Stores all shapes for vfx including GLB model support.
  * 
  * @author Moykul O'Conghaile
- * @version 1.0
+ * @version 2.0
  * @class shapeGenerators
  */
-// shapeGenerators.js - Particle position generation utilities
-//
-// USAGE:
-// import { generatePositions, generateExplosion, generateSphere } from './shapeGenerators';
-// 
-// const positions = generatePositions('sphere', 1000, 2.0, 3.0, 45, 1.2);
-// const explosionPositions = generateExplosion(500, 1.5);
-//
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
+// Global cache for loaded GLB models
+const glbCache = new Map();
+let gltfLoader = null;
+
+/**
+ * Initialize the GLTF loader (lazy initialization)
+ */
+const getGLTFLoader = () => {
+  if (!gltfLoader) {
+    gltfLoader = new GLTFLoader();
+  }
+  return gltfLoader;
+};
+
+/**
+ * Load and cache a GLB model
+ */
+export const loadGLBModel = async (url) => {
+  // Check cache first
+  if (glbCache.has(url)) {
+    return glbCache.get(url);
+  }
+
+  return new Promise((resolve, reject) => {
+    const loader = getGLTFLoader();
+    
+    loader.load(
+      url,
+      (gltf) => {
+        // Extract all mesh geometries from the GLB
+        const meshes = [];
+        
+        gltf.scene.traverse((child) => {
+          if (child.isMesh && child.geometry) {
+            meshes.push(child.geometry);
+          }
+        });
+        
+        if (meshes.length === 0) {
+          reject(new Error('No mesh geometries found in GLB file'));
+          return;
+        }
+        
+        // Use the first mesh (or merge all meshes if needed)
+        const geometry = meshes[0];
+        
+        // Cache the result
+        glbCache.set(url, geometry);
+        resolve(geometry);
+      },
+      (progress) => {
+        console.log('GLB loading progress:', progress);
+      },
+      (error) => {
+        console.error('Error loading GLB:', error);
+        reject(error);
+      }
+    );
+  });
+};
+
+/**
+ * Generate particle positions from GLB model vertices
+ */
+export const generateGLB = async (count, glbPath, radius = 1, heightMultiplier = 1, options = {}) => {
+  const {
+    distributeEvenly = false,
+    surfaceOnly = false,
+    randomOffset = 0.1
+  } = options;
+
+  try {
+    const geometry = await loadGLBModel(glbPath);
+    
+    if (!geometry.attributes.position) {
+      throw new Error('GLB model has no position attributes');
+    }
+    
+    const vertices = geometry.attributes.position.array;
+    const vertexCount = vertices.length / 3;
+    
+    const positions = new Float32Array(count * 3);
+    
+    for (let i = 0; i < count; i++) {
+      const i3 = i * 3;
+      
+      let vertexIndex;
+      if (distributeEvenly) {
+        // Distribute particles evenly across all vertices
+        vertexIndex = Math.floor((i / count) * vertexCount) * 3;
+      } else {
+        // Random vertex selection
+        vertexIndex = Math.floor(Math.random() * vertexCount) * 3;
+      }
+      
+      // Get the vertex position
+      let x = vertices[vertexIndex] * radius;
+      let y = vertices[vertexIndex + 1] * radius * heightMultiplier;
+      let z = vertices[vertexIndex + 2] * radius;
+      
+      // Add random offset if specified
+      if (randomOffset > 0) {
+        x += (Math.random() - 0.5) * randomOffset;
+        y += (Math.random() - 0.5) * randomOffset;
+        z += (Math.random() - 0.5) * randomOffset;
+      }
+      
+      positions[i3] = x;
+      positions[i3 + 1] = y;
+      positions[i3 + 2] = z;
+    }
+    
+    return positions;
+    
+  } catch (error) {
+    console.error('Failed to generate GLB positions:', error);
+    // Fallback to explosion pattern
+    return generateExplosion(count, radius);
+  }
+};
+
+/**
+ * Generate mesh geometry for FlowField-like effects using GLB
+ * This creates a simple mesh representation that can be used for particle effects
+ */
+export const generateFlowFieldMesh = (count, spread, glbPath = null) => {
+  if (glbPath) {
+    // If GLB path provided, create a placeholder that will be replaced
+    // when the actual GLB loads (this is for immediate rendering)
+    return new THREE.PlaneGeometry(spread, spread, 32, 32);
+  }
+  
+  // Default flow field mesh - a subdivided plane with some noise
+  const geometry = new THREE.PlaneGeometry(spread, spread, 32, 32);
+  const positions = geometry.attributes.position.array;
+  
+  // Add some variation to create flow field-like patterns
+  for (let i = 0; i < positions.length; i += 3) {
+    positions[i] += (Math.random() - 0.5) * 0.2; // x variation
+    positions[i + 1] += (Math.random() - 0.5) * 0.2; // y variation
+    positions[i + 2] += (Math.random() - 0.5) * 0.1; // z variation
+  }
+  
+  geometry.attributes.position.needsUpdate = true;
+  geometry.computeVertexNormals();
+  
+  return geometry;
+};
 
 /**
  * Generate particle positions for explosion pattern (radial burst)
@@ -267,26 +409,24 @@ export const generateWave = (count, radius, height, angle, heightMultiplier = 1,
 };
 
 /**
- * Generate a simple mesh for flow field particles
- */
-export const generateFlowFieldMesh = (count, radius = 1, subdivisions = 30) => {
-  const geometry = new THREE.BoxGeometry(radius * 2, radius * 2, radius * 2, subdivisions, subdivisions, subdivisions);
-  return geometry;
-};
-
-/**
  * Main function to generate positions based on shape type
+ * Now supports async GLB loading
  */
-export const generatePositions = (shape, count, radius, height = 2, angle = 0, heightMultiplier = 1, options = {}) => {
+export const generatePositions = async (shape, count, radius, height = 2, angle = 0, heightMultiplier = 1, options = {}) => {
   const {
     hollow = false,
     turns = 2,
     frequency = 3,
     amplitude = 0.5,
-    reverse = false
+    reverse = false,
+    glbPath = '/models/sqMesh.glb' // Default path for GLB
   } = options;
   
   switch (shape) {
+    case 'glb':
+    case 'model':
+      // Handle GLB asynchronously
+      return await generateGLB(count, glbPath, radius, heightMultiplier, options);
     case 'explosion':
       return generateExplosion(count, radius, options.minRadius);
     case 'sphere':
@@ -303,13 +443,23 @@ export const generatePositions = (shape, count, radius, height = 2, angle = 0, h
       return generateSpiral(count, radius, height, heightMultiplier, turns, reverse);
     case 'wave':
       return generateWave(count, radius, height, angle, heightMultiplier, frequency, amplitude);
-    case 'flowfield':
-      // For flow field, we generate a simple mesh positions but they'll be handled by FlowFieldParticles
-      return generateSphere(count, radius, heightMultiplier, false);
     default:
       console.warn(`Unknown shape: ${shape}, falling back to explosion`);
       return generateExplosion(count, radius);
   }
+};
+
+/**
+ * Synchronous version of generatePositions (doesn't support GLB)
+ */
+export const generatePositionsSync = (shape, count, radius, height = 2, angle = 0, heightMultiplier = 1, options = {}) => {
+  if (shape === 'glb' || shape === 'model') {
+    console.warn('GLB shapes require async loading, falling back to explosion');
+    return generateExplosion(count, radius);
+  }
+  
+  // Remove async/await and call generatePositions normally
+  return generatePositions(shape, count, radius, height, angle, heightMultiplier, options);
 };
 
 /**
@@ -318,12 +468,31 @@ export const generatePositions = (shape, count, radius, height = 2, angle = 0, h
 export const getAvailableShapes = () => {
   return [
     'explosion', 'sphere', 'box', 'cone', 'circle', 
-    'square', 'spiral', 'wave', 'flowfield'
+    'square', 'spiral', 'wave', 'glb', 'model'
   ];
+};
+
+/**
+ * Create a fallback geometry for immediate rendering
+ */
+export const createFallbackGeometry = () => {
+  const geometry = new THREE.BufferGeometry();
+  const positions = new Float32Array([0, 0, 0, 1, 0, 0, -1, 0, 0]);
+  const sizes = new Float32Array([1, 1, 1]);
+  const timeMultipliers = new Float32Array([1, 1, 1]);
+  
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('aSize', new THREE.Float32BufferAttribute(sizes, 1));
+  geometry.setAttribute('aTimeMultiplier', new THREE.Float32BufferAttribute(timeMultipliers, 1));
+  geometry.computeBoundingSphere();
+  
+  return geometry;
 };
 
 export default {
   generatePositions,
+  generatePositionsSync,
+  generateGLB,
   generateExplosion,
   generateSphere,
   generateBox,
@@ -332,5 +501,8 @@ export default {
   generateSquare,
   generateSpiral,
   generateWave,
-  getAvailableShapes
+  generateFlowFieldMesh,
+  loadGLBModel,
+  getAvailableShapes,
+  createFallbackGeometry
 };

@@ -5,6 +5,7 @@ import { OrbitControls, Grid, Stats } from '@react-three/drei';
 import { Suspense } from 'react';
 import AnimationTimeline from './AnimationTimeline';
 import VfxEngine from '../vfx/VfxEngine.jsx';
+import { useVfxSettings } from '../../contexts/VfxSettingsContext.jsx';
 
 import fileManager from './fileManager';
 import { 
@@ -14,8 +15,6 @@ import {
   createParameterMapping,
   getDefaultVfxValues
 } from '../vfx/VfxParameters.js';
-import { useVfxSettings } from '../../contexts/VfxSettingsContext.jsx';
-
 // Debug flag
 const DEBUG = false;
 

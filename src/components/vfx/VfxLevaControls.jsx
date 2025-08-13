@@ -5,8 +5,9 @@ import { OrbitControls, Grid, Stats } from '@react-three/drei';
 import { Suspense } from 'react';
 import VfxEngine from './VfxEngine.jsx';
 import fileManager from '../timeline/fileManager';
-import { getDefaultVfxValues } from './VfxParameters.js';
+import { getDefaultVfxValues } from './VfxDefaults.js';
 import { useVfxSettings } from '../../contexts/VfxSettingsContext.jsx';
+
 
 // Debug flag for real-time updates
 const DEBUG = false;
@@ -61,7 +62,7 @@ const VfxLevaControls = () => {
   const shapeControls = useControls("🔺 Shape & Texture", {
     shape: {
       value: defaultValues.shape,
-      options: ['explosion', 'sphere', 'box', 'cone', 'circle', 'square', 'spiral', 'wave', 'flowfield']
+      options: ['explosion', 'sphere', 'box', 'cone', 'circle', 'square', 'spiral', 'wave']
     },
     shapeHeight: { value: defaultValues.shapeHeight, min: 0.5, max: 10.0, step: 0.1 },
     shapeAngle: { value: defaultValues.shapeAngle, min: 0, max: 360, step: 1 },
@@ -71,16 +72,6 @@ const VfxLevaControls = () => {
       options: { 'Circle': 'Circle', 'Heart': 'Heart', 'Point': 'Point', 'Point Cross': 'Point Cross', 'Point Cross 2': 'Point Cross 2', 'Ring': 'Ring', 'Star': 'Star', 'Star 2': 'Star 2' }
     },
     motionBlur: { value: defaultValues.motionBlur }
-  });
-
-  const flowFieldControls = useControls("🌊 Flow Field", {
-    flowFieldStrength: { value: defaultValues.flowFieldStrength, min: 0.0, max: 1.0, step: 0.1 },
-    flowFieldRepulsion: { value: defaultValues.flowFieldRepulsion, min: 0.0, max: 2.0, step: 0.1 },
-    flowFieldInteractive: { value: defaultValues.flowFieldInteractive },
-    flowFieldShape: {
-      value: defaultValues.flowFieldShape,
-      options: { 'Disc': 'disc', 'Ring': 'ring', 'Sphere': 'sphere', 'Square': 'square' }
-    }
   });
 
   // Combine all VFX controls (no transforms)
@@ -97,9 +88,8 @@ const VfxLevaControls = () => {
     ...particleControls,
     ...colorControls,
     ...physicsControls,
-    ...shapeControls,
-    ...flowFieldControls
-  }), [particleControls, colorControls, physicsControls, shapeControls, flowFieldControls]);
+    ...shapeControls
+  }), [particleControls, colorControls, physicsControls, shapeControls]);
 
   // ✅ REAL-TIME: VFX trigger for animation playback
   const actionControls = useControls("🚀 Actions", {

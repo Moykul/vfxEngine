@@ -2,10 +2,9 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useFrame, useThree, extend } from '@react-three/fiber';
 import { shaderMaterial } from '@react-three/drei';
 import * as THREE from 'three';
-import { generatePositions, generateFlowFieldMesh } from '../../utils/shapeGenerators.js';
+import { generatePositions } from '../../utils/shapeGenerators.js';
 import { useVfxTextures } from '../../hooks/index.js';
-import { FIXED_VFX_SETTINGS } from './VfxParameters.js';
-import { FlowFieldParticles } from './FlowFieldParticles.jsx';
+// FIXED_VFX_SETTINGS import removed to avoid loading VfxParameters.js
 
 // Import shaders
 import vfxVertexShader from '../../shaders/vfxShaders/vertex.glsl';
@@ -121,61 +120,76 @@ const VfxEngine = ({
       streakLength, shape, shapeHeight, shapeAngle, heightMultiplier, 
       sizeVariation, timeVariation, animationPreset, particleTexture, motionBlur]);
 
-  // ✅ SIMPLIFIED: Geometry generation
-  const geometry = useMemo(() => {
-    try {
-      const positions = generatePositions(
-        effectiveValues.shape, 
-        effectiveValues.pCount, 
-        effectiveValues.spread, 
-        effectiveValues.shapeHeight || 2.0,
-        effectiveValues.shapeAngle || 0,
-        effectiveValues.heightMultiplier || 1.0
-      );
+    // Fallback geometry helper (declare before use)
+    const createFallbackGeometry = useMemo(() => {
+      return () => {
+        const geo = new THREE.BufferGeometry();
+        const positions = new Float32Array([0, 0, 0, 1, 0, 0, -1, 0, 0]);
+        const sizes = new Float32Array([1, 1, 1]);
+        const timeMultipliers = new Float32Array([1, 1, 1]);
+      
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+        geo.setAttribute('aSize', new THREE.Float32BufferAttribute(sizes, 1));
+        geo.setAttribute('aTimeMultiplier', new THREE.Float32BufferAttribute(timeMultipliers, 1));
+        geo.computeBoundingSphere();
+      
+        return geo;
+      };
+    }, []);
 
-      if (!positions || positions.length === 0) {
-        console.warn('Empty positions array, using fallback');
-        return createFallbackGeometry();
-      }
+    // Geometry state generated asynchronously (supports GLB and avoids Promise issues)
+    const [geometry, setGeometry] = useState(() => createFallbackGeometry());
 
-      const sizes = new Float32Array(effectiveValues.pCount);
-      const timeMultipliers = new Float32Array(effectiveValues.pCount);
-      
-      for (let i = 0; i < effectiveValues.pCount; i++) {
-        sizes[i] = Math.random() * (effectiveValues.sizeVariation || 0.5) + (1 - (effectiveValues.sizeVariation || 0.5)/2);
-        timeMultipliers[i] = 1 + Math.random() * (effectiveValues.timeVariation || 0.4);
-      }
-      
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-      geo.setAttribute('aSize', new THREE.Float32BufferAttribute(sizes, 1));
-      geo.setAttribute('aTimeMultiplier', new THREE.Float32BufferAttribute(timeMultipliers, 1));
-      geo.computeBoundingSphere();
-      
-      return geo;
-      
-    } catch (error) {
-      console.error('Error creating geometry:', error);
-      return createFallbackGeometry();
-    }
-  }, [effectiveValues.shape, effectiveValues.pCount, effectiveValues.spread, 
-      effectiveValues.shapeHeight, effectiveValues.shapeAngle, effectiveValues.heightMultiplier,
-      effectiveValues.sizeVariation, effectiveValues.timeVariation]);
+    useEffect(() => {
+      let cancelled = false;
+      (async () => {
+        try {
+          const positions = await generatePositions(
+            effectiveValues.shape,
+            effectiveValues.pCount,
+            effectiveValues.spread,
+            effectiveValues.shapeHeight || 2.0,
+            effectiveValues.shapeAngle || 0,
+            effectiveValues.heightMultiplier || 1.0
+          );
 
-  // Fallback geometry
-  const createFallbackGeometry = () => {
-    const geo = new THREE.BufferGeometry();
-    const positions = new Float32Array([0, 0, 0, 1, 0, 0, -1, 0, 0]);
-    const sizes = new Float32Array([1, 1, 1]);
-    const timeMultipliers = new Float32Array([1, 1, 1]);
-    
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-    geo.setAttribute('aSize', new THREE.Float32BufferAttribute(sizes, 1));
-    geo.setAttribute('aTimeMultiplier', new THREE.Float32BufferAttribute(timeMultipliers, 1));
-    geo.computeBoundingSphere();
-    
-    return geo;
-  };
+          if (!positions || !positions.length) {
+            if (!cancelled) setGeometry(createFallbackGeometry());
+            return;
+          }
+
+          const sizes = new Float32Array(effectiveValues.pCount);
+          const timeMultipliers = new Float32Array(effectiveValues.pCount);
+          for (let i = 0; i < effectiveValues.pCount; i++) {
+            sizes[i] = Math.random() * (effectiveValues.sizeVariation || 0.5) + (1 - (effectiveValues.sizeVariation || 0.5) / 2);
+            timeMultipliers[i] = 1 + Math.random() * (effectiveValues.timeVariation || 0.4);
+          }
+
+          const geo = new THREE.BufferGeometry();
+          geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+          geo.setAttribute('aSize', new THREE.Float32BufferAttribute(sizes, 1));
+          geo.setAttribute('aTimeMultiplier', new THREE.Float32BufferAttribute(timeMultipliers, 1));
+          geo.computeBoundingSphere();
+
+          if (!cancelled) setGeometry(geo);
+        } catch (error) {
+          console.error('Error creating geometry:', error);
+          if (!cancelled) setGeometry(createFallbackGeometry());
+        }
+      })();
+
+      return () => { cancelled = true; };
+    }, [
+      effectiveValues.shape,
+      effectiveValues.pCount,
+      effectiveValues.spread,
+      effectiveValues.shapeHeight,
+      effectiveValues.shapeAngle,
+      effectiveValues.heightMultiplier,
+      effectiveValues.sizeVariation,
+      effectiveValues.timeVariation,
+      createFallbackGeometry
+    ]);
 
   // Handle animation triggers only (not real-time updates)
   useEffect(() => {
@@ -260,43 +274,6 @@ const VfxEngine = ({
     }
   };
 
-  // Render flow field effect if shape is 'flowfield'
-  if (effectiveValues.shape === 'flowfield') {
-    const flowFieldMesh = useMemo(() => {
-      return generateFlowFieldMesh(effectiveValues.pCount || 800, effectiveValues.spread || 2);
-    }, [effectiveValues.pCount, effectiveValues.spread]);
-
-    return (
-      <group 
-        position={[effectiveValues.positionX || 0, effectiveValues.positionY || 0, effectiveValues.positionZ || 0]} 
-        scale={[effectiveValues.scale || 1, effectiveValues.scale || 1, effectiveValues.scale || 1]} 
-        rotation={[
-          (effectiveValues.rotationX || 0) * Math.PI / 180, 
-          (effectiveValues.rotationY || 0) * Math.PI / 180, 
-          (effectiveValues.rotationZ || 0) * Math.PI / 180
-        ]}
-      >
-        <FlowFieldParticles
-          name="VFXFlowField"
-          debug={false}
-          interactive={effectiveValues.flowFieldInteractive}
-          childMeshVisible={false}
-          size={effectiveValues.pSize || 0.1}
-          colors={[effectiveValues.color || '#9eff30', effectiveValues.colorEnd || '#00eeff']}
-          disturbIntensity={effectiveValues.flowFieldStrength || 0.3}
-          repulsionForce={effectiveValues.flowFieldRepulsion || 1.0}
-          shape={effectiveValues.flowFieldShape || 'disc'}
-          lightSource={null}
-        >
-          <mesh geometry={flowFieldMesh}>
-            <meshBasicMaterial color={effectiveValues.color || '#9eff30'} transparent opacity={0.1} />
-          </mesh>
-        </FlowFieldParticles>
-      </group>
-    );
-  }
-
-  // Standard VFX rendering for other shapes
   return (
     <points 
       ref={meshRef}
