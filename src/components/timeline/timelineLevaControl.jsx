@@ -6,154 +6,246 @@ import { Suspense } from 'react';
 import AnimationTimeline from './AnimationTimeline';
 import VfxEngine from '../vfx/VfxEngine.jsx';
 import fileManager from './fileManager';
-import { 
-  ANIMATABLE_VFX_PARAMS,
-  getTimelineModel,
-  createNormalizeFunctions,
-  createParameterMapping,
-  getDefaultVfxValues
-} from '../vfx/VfxParameters.js';
+import { useVfxSettings } from '../../contexts/VfxSettingsContext.jsx';
 
 // Debug flag
 const DEBUG = false;
 
 const TimelineController = () => {
-  const defaultValues = useMemo(() => getDefaultVfxValues(), []);
-  const [timelineValues, setTimelineValues] = useState({});
-  const [isTimelineActive, setIsTimelineActive] = useState(false);
-
-  // ✅ ORGANIZED: Categorized Leva controls for better UX
-  const transformControls = useControls("📍 Transform", {
-    positionX: { value: defaultValues.positionX, min: -10, max: 10, step: 0.1 },
-    positionY: { value: defaultValues.positionY, min: -10, max: 10, step: 0.1 },
-    positionZ: { value: defaultValues.positionZ, min: -10, max: 10, step: 0.1 },
-    rotationX: { value: defaultValues.rotationX, min: 0, max: 360, step: 1 },
-    rotationY: { value: defaultValues.rotationY, min: 0, max: 360, step: 1 },
-    rotationZ: { value: defaultValues.rotationZ, min: 0, max: 360, step: 1 },
-    scale: { value: defaultValues.scale, min: 0.1, max: 5, step: 0.1 },
-    opacity: { value: defaultValues.opacity, min: 0.0, max: 1.0, step: 0.1 }
-  });
-
-  const particleControls = useControls("✨ Particles", {
-    pCount: { value: defaultValues.pCount, min: 50, max: 2000, step: 10 },
-    duration: { value: defaultValues.duration, min: 0.5, max: 10.0, step: 0.1 },
-    pSize: { value: defaultValues.pSize, min: 0.01, max: 1.0, step: 0.01 },
-    spread: { value: defaultValues.spread, min: 0.5, max: 10, step: 0.1 }
-  });
-
-  const colorControls = useControls("🎨 Colors & Effects", {
-    color: { value: defaultValues.color },
-    colorEnd: { value: defaultValues.colorEnd },
-    useGradient: { value: defaultValues.useGradient },
-    blendMode: { 
-      value: defaultValues.blendMode,
-      options: { 'Additive': 0, 'Normal': 1, 'Multiply': 2, 'Subtractive': 3 }
-    }
-  });
-
-  const physicsControls = useControls("⚡ Physics", {
-    gravity: { value: defaultValues.gravity, min: -15.0, max: 15.0, step: 0.1 },
-    turbulence: { value: defaultValues.turbulence, min: 0.0, max: 5.0, step: 0.1 }
-  });
-
-  const shapeControls = useControls("🔺 Shape & Texture", {
-    shape: {
-      value: defaultValues.shape,
-      options: ['explosion', 'sphere', 'box', 'cone', 'circle', 'square', 'spiral', 'wave']
+  // ✅ RESTORED: Read VFX settings from shared context
+  const { vfxSettings } = useVfxSettings();
+  // ✅ PROVEN PATTERN: Enhanced parameter definitions with organized grouping (from R3F reference)
+  const parameterDefinitions = useMemo(() => ({
+    // Transform parameters - following exact R3F pattern
+    positionX: { 
+      value: 0, min: -10, max: 10, step: 0.1,
+      timelineName: 'positionX',
+      displayName: '🔧 Position X',
+      color: '#3B82F6',
+      strokeColor: '#2563EB',
+      group: 'transform'
     },
-    particleTexture: {
-      value: defaultValues.particleTexture,
-      options: { 'Circle': 'Circle', 'Heart': 'Heart', 'Point': 'Point', 'Star': 'Star' }
+    positionY: { 
+      value: 0, min: -10, max: 10, step: 0.1,
+      timelineName: 'positionY', 
+      displayName: '🔧 Position Y',
+      color: '#10B981',
+      strokeColor: '#059669',
+      group: 'transform'
+    },
+    positionZ: { 
+      value: 0, min: -10, max: 10, step: 0.1,
+      timelineName: 'positionZ',
+      displayName: '🔧 Position Z', 
+      color: '#F59E0B',
+      strokeColor: '#D97706',
+      group: 'transform'
+    },
+
+    // Rotation parameters
+    rotationX: {
+      value: 0, min: 0, max: 360, step: 1,
+      timelineName: 'rotationX',
+      displayName: '🔄 Rotation X',
+      color: '#EF4444',
+      strokeColor: '#DC2626',
+      group: 'rotation'
+    },
+    rotationY: {
+      value: 0, min: 0, max: 360, step: 1,
+      timelineName: 'rotationY',
+      displayName: '🔄 Rotation Y',
+      color: '#F97316',
+      strokeColor: '#EA580C',
+      group: 'rotation'
+    },
+    rotationZ: {
+      value: 0, min: 0, max: 360, step: 1,
+      timelineName: 'rotationZ',
+      displayName: '🔄 Rotation Z',
+      color: '#84CC16',
+      strokeColor: '#65A30D',
+      group: 'rotation'
+    },
+
+    // Scale parameter
+    scale: {
+      value: 1, min: 0.1, max: 5, step: 0.1,
+      timelineName: 'scale',
+      displayName: '📏 Scale',
+      color: '#8B5CF6', 
+      strokeColor: '#7C3AED',
+      group: 'scale'
+    },
+
+    // Opacity parameter
+    opacity: {
+      value: 1.0, min: 0.0, max: 1.0, step: 0.1,
+      timelineName: 'opacity',
+      displayName: '👻 Opacity',
+      color: '#EC4899',
+      strokeColor: '#DB2777',
+      group: 'opacity'
     }
-  });
+  }), []);
 
-  // Combine all controls into single object
-  const allVfxValues = useMemo(() => ({
-    ...transformControls,
-    ...particleControls,
-    ...colorControls,
-    ...physicsControls,
-    ...shapeControls
-  }), [transformControls, particleControls, colorControls, physicsControls, shapeControls]);
+  // ✅ PROVEN PATTERN: Generate Leva controls from parameter definitions (exact R3F pattern)
+  const levaConfig = useMemo(() => {
+    const config = {};
+    Object.entries(parameterDefinitions).forEach(([key, def]) => {
+      config[key] = {
+        value: def.value,
+        min: def.min,
+        max: def.max,
+        step: def.step
+      };
+    });
+    return config;
+  }, [parameterDefinitions]);
 
-  // ✅ SEPARATE: Direct VFX trigger (no timeline dependency)
-  const actionControls = useControls("🚀 Actions", {
-    'Fire Current Settings!': button(() => {
-      console.log('🚀 Firing VFX with values:', allVfxValues);
-      // Direct trigger without timeline involvement
-      setTimelineValues({ ...allVfxValues, trigger: true });
-      // Auto-reset after brief moment
-      setTimeout(() => {
-        setTimelineValues(prev => ({ ...prev, trigger: false }));
-      }, 100);
-    })
-  });
+  const [vfxValues, setVfxValues] = useControls('VFX Transform', () => levaConfig);
 
-  // ✅ SEPARATE: Transform-only controls for quick adjustments
-  const quickTransformControls = useControls("⚡ Quick Transform", {
-    'Reset Position': button(() => {
-      // Reset only transform values, keeping other settings
-      setTimelineValues({ 
-        ...allVfxValues, 
-        positionX: 0, 
-        positionY: 0, 
-        positionZ: 0,
-        trigger: true 
-      });
-      setTimeout(() => {
-        setTimelineValues(prev => ({ ...prev, trigger: false }));
-      }, 100);
+  // ✅ PROVEN PATTERN: Generate timeline model from parameter definitions (exact R3F pattern)
+  const timelineModel = useMemo(() => {
+    const rows = Object.entries(parameterDefinitions).map(([levaKey, def]) => ({
+      name: def.timelineName,
+      displayName: def.displayName,
+      keyframes: [],
+      style: { 
+        fillStyle: def.color, 
+        strokeColor: def.strokeColor, 
+        height: 21 
+      },
+      _levaKey: levaKey,
+      _min: def.min,
+      _max: def.max,
+      _group: def.group
+    }));
+
+    return { rows };
+  }, [parameterDefinitions]);
+
+  // ✅ PROVEN PATTERN: Create normalization functions (exact R3F pattern)
+  const createNormalizeFunctions = useMemo(() => {
+    const normalize = {};
+    const denormalize = {};
+    
+    Object.entries(parameterDefinitions).forEach(([levaKey, def]) => {
+      const timelineName = def.timelineName;
+      const range = def.max - def.min;
+      
+      normalize[timelineName] = (value) => {
+        return (value - def.min) / range;
+      };
+      
+      denormalize[timelineName] = (normalizedValue) => {
+        return def.min + (normalizedValue * range);
+      };
+    });
+    
+    return { normalize, denormalize };
+  }, [parameterDefinitions]);
+
+  // ✅ PROVEN PATTERN: Create parameter mapping (exact R3F pattern)
+  const parameterMapping = useMemo(() => {
+    const timelineToLeva = {};
+    const levaToTimeline = {};
+    
+    Object.entries(parameterDefinitions).forEach(([levaKey, def]) => {
+      timelineToLeva[def.timelineName] = levaKey;
+      levaToTimeline[levaKey] = def.timelineName;
+    });
+    
+    return { timelineToLeva, levaToTimeline };
+  }, [parameterDefinitions]);
+
+  // ✅ PROVEN PATTERN: Timeline controls (exact R3F pattern)
+  const fileInputRef = useRef();
+  const [{ timelineVisible }, setTimelineVisible] = useControls('Timeline', () => ({
+    timelineVisible: { value: true, label: 'Show Timeline' },
+    exportAnimation: button(() => {
+      const timeline = timelineRef.current && timelineRef.current.getTimeline ? timelineRef.current.getTimeline() : null;
+      if (!timeline) return;
+      const model = timeline.getModel ? timeline.getModel() : null;
+      if (!model) return;
+      fileManager.saveJSON(model, 'vfx-animation-timeline.json');
     }),
-    'Reset Rotation': button(() => {
-      setTimelineValues({ 
-        ...allVfxValues, 
-        rotationX: 0, 
-        rotationY: 0, 
-        rotationZ: 0,
-        trigger: true 
-      });
-      setTimeout(() => {
-        setTimelineValues(prev => ({ ...prev, trigger: false }));
-      }, 100);
-    }),
-    'Reset Scale': button(() => {
-      setTimelineValues({ 
-        ...allVfxValues, 
-        scale: 1,
-        trigger: true 
-      });
-      setTimeout(() => {
-        setTimelineValues(prev => ({ ...prev, trigger: false }));
-      }, 100);
-    })
-  });
-
-  // ✅ SIMPLIFIED: File operations in single group
-  const fileControls = useControls('💾 File Operations', {
-    'Save Settings': button(() => {
-      fileManager.saveJSON(allVfxValues, 'vfx-settings.json');
-    }),
-    'Load Settings': button(() => {
+    importAnimation: button(() => {
       if (fileInputRef.current) fileInputRef.current.click();
     })
-  });
+  }));
 
-  const timelineControls = useControls('🎬 Timeline', {
-    timelineVisible: { value: true, label: 'Show Timeline' },
-    enableTimeline: { value: true, label: 'Enable Timeline System' }
-  });
-
-  const timelineVisible = timelineControls.timelineVisible;
-  const timelineEnabled = timelineControls.enableTimeline;
-
-  // ✅ SIMPLIFIED: Setup
-  const timelineModel = useMemo(() => getTimelineModel(), []);
-  const normalizeFunctions = useMemo(() => createNormalizeFunctions(), []);
-  const parameterMapping = useMemo(() => createParameterMapping(), []);
-
+  // ✅ PROVEN PATTERN: State and refs (exact R3F pattern)
   const [currentTime, setCurrentTime] = useState(0);
   const timelineRef = useRef(null);
-  const fileInputRef = useRef();
+  const timelineDrivenRef = useRef(false);
+  const isPlayingRef = useRef(false);
+  const prevUserValuesRef = useRef({ ...vfxValues });
+
+  // ✅ PROVEN PATTERN: Handle timeline updates with organized data structure (exact R3F pattern)
+  const handleLevaUpdate = useCallback((interpolated) => {
+    if (!interpolated) return;
+    
+    isPlayingRef.current = interpolated.isPlaying || false;
+    
+    // Convert timeline values to Leva updates
+    const updates = {};
+    Object.entries(interpolated).forEach(([timelineName, value]) => {
+      if (value !== undefined && parameterMapping.timelineToLeva[timelineName]) {
+        const levaKey = parameterMapping.timelineToLeva[timelineName];
+        updates[levaKey] = value;
+      }
+    });
+    
+    if (Object.keys(updates).length > 0) {
+      timelineDrivenRef.current = true;
+      setVfxValues(updates);
+      setTimeout(() => { timelineDrivenRef.current = false; }, 0);
+    }
+  }, [setVfxValues, parameterMapping]);
+
+  // ✅ RESTORED: Track timeline playing state for VFX trigger
+  const [isTimelinePlaying, setIsTimelinePlaying] = useState(false);
+
+  const handlePlaybackChange = useCallback((playing) => {
+    isPlayingRef.current = playing;
+    setIsTimelinePlaying(playing);
+  }, []);
+
+  // ✅ PROVEN PATTERN: Handle manual Leva control updates (exact R3F pattern)
+  useEffect(() => {
+    // Skip if timeline is driving the changes
+    if (timelineDrivenRef.current || isPlayingRef.current) return;
+    
+    console.log('🎮 VFX Leva values changed:', vfxValues);
+
+    // Handle keyframe creation
+    const timeline = timelineRef.current;
+    if (timeline && timeline.addKeyframe && timeline.isInitialized()) {
+      // Check all parameters dynamically
+      Object.entries(parameterDefinitions).forEach(([levaKey, def]) => {
+        const currentValue = vfxValues[levaKey];
+        const prevValue = prevUserValuesRef.current[levaKey];
+        
+        if (Math.abs(currentValue - prevValue) > (def.step || 0.001)) {
+          timeline.addKeyframe(def.timelineName, currentValue, currentTime);
+          prevUserValuesRef.current[levaKey] = currentValue;
+        }
+      });
+    }
+  }, [vfxValues, currentTime, parameterDefinitions]);
+
+  // ✅ PROVEN PATTERN: File import (exact R3F pattern)
+  const handleImport = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    fileManager.loadJSON(file, (model) => {
+      const timeline = timelineRef.current && timelineRef.current.getTimeline ? timelineRef.current.getTimeline() : null;
+      if (timeline && timeline.setModel) {
+        timeline.setModel(model);
+      }
+    });
+  };
 
   // Canvas styles
   useEffect(() => {
@@ -171,40 +263,6 @@ const TimelineController = () => {
     document.head.appendChild(style);
     return () => document.head.removeChild(style);
   }, []);
-
-  // ✅ SEPARATED: Timeline updates only when timeline system is enabled
-  const handleLevaUpdate = useCallback((interpolatedValues) => {
-    if (!interpolatedValues || !timelineEnabled) return;
-    
-    setTimelineValues({
-      ...allVfxValues,
-      ...interpolatedValues,
-      timelineActive: true,
-      isTimelinePlaying: interpolatedValues.isPlaying || false,
-      currentTime: currentTime
-    });
-    setIsTimelineActive(true);
-  }, [allVfxValues, currentTime, timelineEnabled]);
-
-  // ✅ SIMPLIFIED: Final values logic - timeline only overrides when enabled
-  const finalVfxValues = useMemo(() => {
-    if (timelineEnabled && isTimelineActive && Object.keys(timelineValues).length > 0) {
-      return timelineValues;
-    }
-    return allVfxValues;
-  }, [allVfxValues, timelineValues, isTimelineActive, timelineEnabled]);
-
-  // File import
-  const handleImport = (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    fileManager.loadJSON(file, (model) => {
-      const timeline = timelineRef.current?.getTimeline?.();
-      if (timeline?.setModel) {
-        timeline.setModel(model);
-      }
-    });
-  };
 
   return (
     <>
@@ -274,11 +332,22 @@ const TimelineController = () => {
             fadeStrength={1}
           />
 
-          {/* ✅ VfxEngine directly in Canvas */}
+          {/* ✅ RESTORED: VfxEngine using shared context + timeline transforms + trigger */}
           <VfxEngine 
-            allVfxValues={finalVfxValues}
-            onComplete={() => {
-              setTimelineValues(prev => ({ ...prev, trigger: false }));
+            allVfxValues={{
+              // ✅ RESTORED: Use shared VFX settings from context
+              ...vfxSettings,
+              // Timeline transform overrides
+              positionX: vfxValues.positionX,
+              positionY: vfxValues.positionY,
+              positionZ: vfxValues.positionZ,
+              rotationX: vfxValues.rotationX,
+              rotationY: vfxValues.rotationY,
+              rotationZ: vfxValues.rotationZ,
+              scale: vfxValues.scale,
+              opacity: vfxValues.opacity,
+              // ✅ RESTORED: Trigger VFX animation when timeline plays
+              trigger: isTimelinePlaying
             }}
           />
           
@@ -287,27 +356,19 @@ const TimelineController = () => {
         </Suspense>
       </Canvas>
       
-      {/* ✅ CONDITIONAL: Timeline only renders when enabled */}
-      {timelineEnabled && (
-        <AnimationTimeline
-          ref={timelineRef}
-          visible={timelineVisible}
-          duration={3000}
-          vfxValues={allVfxValues}
-          onLevaUpdate={handleLevaUpdate}
-          onTimeChange={setCurrentTime}
-          onPlaybackChange={(isPlaying) => {
-            if (!isPlaying) {
-              setIsTimelineActive(false);
-              setTimelineValues({});
-            }
-          }}
-          initialModel={timelineModel}
-          normalizeFunctions={normalizeFunctions}
-          parameterMapping={parameterMapping}
-          shouldPlay={false}
-        />
-      )}
+      {/* ✅ PROVEN PATTERN: Timeline with exact same props as R3F reference */}
+      <AnimationTimeline
+        ref={timelineRef}
+        visible={timelineVisible}
+        duration={5000}
+        levaValues={vfxValues}
+        onLevaUpdate={handleLevaUpdate}
+        onTimeChange={setCurrentTime}
+        onPlaybackChange={handlePlaybackChange}
+        initialModel={timelineModel}
+        normalizeFunctions={createNormalizeFunctions}
+        parameterMapping={parameterMapping}
+      />
     </>
   );
 };

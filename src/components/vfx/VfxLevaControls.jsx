@@ -5,7 +5,7 @@ import { OrbitControls, Grid, Stats } from '@react-three/drei';
 import { Suspense } from 'react';
 import VfxEngine from './VfxEngine.jsx';
 import fileManager from '../timeline/fileManager';
-import { getDefaultVfxValues } from './VfxDefaults.js';
+import { getVfxValues } from './VfxParameters.js';
 import { useVfxSettings } from '../../contexts/VfxSettingsContext.jsx';
 
 
@@ -13,8 +13,7 @@ import { useVfxSettings } from '../../contexts/VfxSettingsContext.jsx';
 const DEBUG = false;
 
 const VfxLevaControls = () => {
-  const defaultValues = useMemo(() => getDefaultVfxValues(), []);
-  const [vfxValues, setVfxValues] = useState({});
+  const [vfxValues, setVfxValues] = useState(() => getVfxValues());
   const fileInputRef = useRef();
   
   // ✅ SHARED: Use shared VFX settings context
@@ -24,66 +23,70 @@ const VfxLevaControls = () => {
   // Transform controls removed - handled by timeline mode only
 
   const particleControls = useControls("✨ Particles", {
-    pCount: { value: defaultValues.pCount, min: 50, max: 2000, step: 10 },
-    duration: { value: defaultValues.duration, min: 0.5, max: 10.0, step: 0.1 },
+    pCount: { value: vfxValues.pCount, min: 50, max: 2000, step: 10 },
+    duration: { value: vfxValues.duration, min: 0.5, max: 10.0, step: 0.1 },
     pSize: { 
-      value: defaultValues.pSize, 
+      value: vfxValues.pSize, 
       min: 0.01, 
       max: 1.0, 
       step: 0.01,
       label: 'Particle Size (real-time)'
     },
-    spread: { value: defaultValues.spread, min: 0.5, max: 10, step: 0.1 },
-    pAge: { value: defaultValues.pAge, min: 0.1, max: 3.0, step: 0.1 },
-    sizeVariation: { value: defaultValues.sizeVariation, min: 0.0, max: 1.0, step: 0.1 },
-    timeVariation: { value: defaultValues.timeVariation, min: 0.0, max: 1.0, step: 0.1 }
+    spread: { value: vfxValues.spread, min: 0.5, max: 10, step: 0.1 },
+    pAge: { value: vfxValues.pAge, min: 0.1, max: 3.0, step: 0.1 },
+    sizeVariation: { value: vfxValues.sizeVariation, min: 0.0, max: 1.0, step: 0.1 },
+    timeVariation: { value: vfxValues.timeVariation, min: 0.0, max: 1.0, step: 0.1 }
   });
 
   const colorControls = useControls("🎨 Colors & Effects", {
-    color: { value: defaultValues.color },
-    colorEnd: { value: defaultValues.colorEnd },
-    useGradient: { value: defaultValues.useGradient },
-    opacity: { value: defaultValues.opacity, min: 0.0, max: 1.0, step: 0.1 },
+    color: { value: vfxValues.color },
+    colorEnd: { value: vfxValues.colorEnd },
+    useGradient: { value: vfxValues.useGradient },
+    opacity: { value: vfxValues.opacity, min: 0.0, max: 1.0, step: 0.1 },
     blendMode: { 
-      value: defaultValues.blendMode,
+      value: vfxValues.blendMode,
       options: { 'Additive': 0, 'Normal': 1, 'Multiply': 2, 'Subtractive': 3 }
     }
   });
 
   const physicsControls = useControls("⚡ Physics", {
-    gravity: { value: defaultValues.gravity, min: -15.0, max: 15.0, step: 0.1 },
-    turbulence: { value: defaultValues.turbulence, min: 0.0, max: 5.0, step: 0.1 },
-    directionalForceX: { value: defaultValues.directionalForceX, min: -10.0, max: 10.0, step: 0.1 },
-    directionalForceY: { value: defaultValues.directionalForceY, min: -10.0, max: 10.0, step: 0.1 },
-    directionalForceZ: { value: defaultValues.directionalForceZ, min: -10.0, max: 10.0, step: 0.1 },
-    streakLength: { value: defaultValues.streakLength, min: 0.0, max: 2.0, step: 0.1 }
+    gravity: { value: vfxValues.gravity, min: -15.0, max: 15.0, step: 0.1 },
+    turbulence: { value: vfxValues.turbulence, min: 0.0, max: 5.0, step: 0.1 },
+    directionalForceX: { value: vfxValues.directionalForceX, min: -10.0, max: 10.0, step: 0.1 },
+    directionalForceY: { value: vfxValues.directionalForceY, min: -10.0, max: 10.0, step: 0.1 },
+    directionalForceZ: { value: vfxValues.directionalForceZ, min: -10.0, max: 10.0, step: 0.1 },
+    streakLength: { value: vfxValues.streakLength, min: 0.0, max: 2.0, step: 0.1 }
   });
 
   const shapeControls = useControls("🔺 Shape & Texture", {
     shape: {
-      value: defaultValues.shape,
-      options: ['explosion', 'sphere', 'box', 'cone', 'circle', 'square', 'spiral', 'wave']
+      value: vfxValues.shape,
+      options: ['explosion', 'sphere', 'box', 'cone', 'circle', 'square', 'spiral', 'wave', 'glb', 'model']
     },
-    shapeHeight: { value: defaultValues.shapeHeight, min: 0.5, max: 10.0, step: 0.1 },
-    shapeAngle: { value: defaultValues.shapeAngle, min: 0, max: 360, step: 1 },
-    heightMultiplier: { value: defaultValues.heightMultiplier, min: 0.1, max: 5.0, step: 0.1 },
+    shapeHeight: { value: vfxValues.shapeHeight, min: 0.5, max: 10.0, step: 0.1 },
+    shapeAngle: { value: vfxValues.shapeAngle, min: 0, max: 360, step: 1 },
+    heightMultiplier: { value: vfxValues.heightMultiplier, min: 0.1, max: 5.0, step: 0.1 },
+    animationPreset: {
+      value: vfxValues.animationPreset,
+      options: ['none', 'fadeIn', 'fadeOut', 'spiral', 'burst', 'gravity']
+    },
     particleTexture: {
-      value: defaultValues.particleTexture,
+      value: vfxValues.particleTexture,
       options: { 'Circle': 'Circle', 'Heart': 'Heart', 'Point': 'Point', 'Point Cross': 'Point Cross', 'Point Cross 2': 'Point Cross 2', 'Ring': 'Ring', 'Star': 'Star', 'Star 2': 'Star 2' }
     },
-    motionBlur: { value: defaultValues.motionBlur }
+    motionBlur: { value: vfxValues.motionBlur }
   });
 
   // Combine all VFX controls (no transforms)
   const allVfxValues = useMemo(() => ({
     // Default transform values (not controllable in VFX mode)
-    positionX: defaultValues.positionX,
-    positionY: defaultValues.positionY,
-    positionZ: defaultValues.positionZ,
-    rotationX: defaultValues.rotationX,
-    rotationY: defaultValues.rotationY,
-    rotationZ: defaultValues.rotationZ,
-    scale: defaultValues.scale,
+    positionX: vfxValues.positionX,
+    positionY: vfxValues.positionY,
+    positionZ: vfxValues.positionZ,
+    rotationX: vfxValues.rotationX,
+    rotationY: vfxValues.rotationY,
+    rotationZ: vfxValues.rotationZ,
+    scale: vfxValues.scale,
     // VFX effect parameters only
     ...particleControls,
     ...colorControls,

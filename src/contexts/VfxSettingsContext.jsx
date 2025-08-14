@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { getDefaultVfxValues } from '../components/vfx/VfxDefaults.js';
+import { getVfxValues } from '../components/vfx/VfxParameters.js';
 
 // Context for sharing VFX settings between VfxLevaControls and TimelineLevaControls
 const VfxSettingsContext = createContext();
@@ -13,7 +13,7 @@ export const useVfxSettings = () => {
 };
 
 export const VfxSettingsProvider = ({ children }) => {
-  const [vfxSettings, setVfxSettings] = useState(() => getDefaultVfxValues());
+  const [vfxSettings, setVfxSettings] = useState(() => getVfxValues());
 
   // Debug logging when settings change
   useEffect(() => {

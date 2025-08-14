@@ -170,7 +170,7 @@ export const createParameterMapping = () => {
 };
 
 // All default values in one place
-export const getDefaultVfxValues = () => {
+export const getVfxValues = () => {
   return {
     // Transform parameters (animatable)
     positionX: 0,

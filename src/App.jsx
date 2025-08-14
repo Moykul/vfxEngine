@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useControls } from 'leva';
 import { VfxSettingsProvider } from './contexts/VfxSettingsContext.jsx';
 import VfxLevaControls from './components/vfx/VfxLevaControls.jsx';
-import TimelineLevaControls from './components/timeline/TimelineLevaControls.jsx';
+import TimelineController from './components/timeline/timelineLevaControl.jsx';
 
 // Debug flag
 const DEBUG = false;
@@ -41,7 +41,7 @@ const App = () => {
   return (
     <VfxSettingsProvider>
       {modeControls.mode === 'vfx' && <VfxLevaControls />}
-      {modeControls.mode === 'timeline' && <TimelineLevaControls />}
+      {modeControls.mode === 'timeline' && <TimelineController />}
     </VfxSettingsProvider>
   );
 };
