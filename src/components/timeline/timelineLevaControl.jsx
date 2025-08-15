@@ -13,7 +13,7 @@ const DEBUG = false;
 
 const TimelineController = () => {
   // ✅ RESTORED: Read VFX settings from shared context
-  const { vfxSettings } = useVfxSettings();
+  const { vfxSettings, updateVfxSettings } = useVfxSettings();
   // ✅ PROVEN PATTERN: Enhanced parameter definitions with organized grouping (from R3F reference)
   const parameterDefinitions = useMemo(() => ({
     // Transform parameters - following exact R3F pattern
@@ -168,7 +168,20 @@ const TimelineController = () => {
       if (!timeline) return;
       const model = timeline.getModel ? timeline.getModel() : null;
       if (!model) return;
-      fileManager.saveJSON(model, 'vfx-animation-timeline.json');
+      
+      // ✅ COMBINED: Export both VFX settings and timeline data
+      const combinedData = {
+        vfxSettings: vfxSettings,
+        timeline: model,
+        metadata: {
+          version: "1.0",
+          created: new Date().toISOString(),
+          duration: 5000,
+          description: "VFX Animation with Timeline"
+        }
+      };
+      
+      fileManager.saveJSON(combinedData, 'vfx-animation-complete.json');
     }),
     importAnimation: button(() => {
       if (fileInputRef.current) fileInputRef.current.click();
@@ -235,14 +248,43 @@ const TimelineController = () => {
     }
   }, [vfxValues, currentTime, parameterDefinitions]);
 
-  // ✅ PROVEN PATTERN: File import (exact R3F pattern)
+  // ✅ COMBINED: File import for both VFX settings and timeline data
   const handleImport = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    fileManager.loadJSON(file, (model) => {
+    
+    fileManager.loadJSON(file, (data) => {
       const timeline = timelineRef.current && timelineRef.current.getTimeline ? timelineRef.current.getTimeline() : null;
-      if (timeline && timeline.setModel) {
-        timeline.setModel(model);
+      
+      // Check if it's the new combined format
+      if (data.vfxSettings && data.timeline) {
+        console.log('📁 Loading combined VFX animation file');
+        
+        // Update VFX settings first
+        if (updateVfxSettings) {
+          updateVfxSettings(data.vfxSettings);
+          console.log('✅ VFX settings restored');
+        }
+        
+        // Update timeline data
+        if (timeline && timeline.setModel) {
+          timeline.setModel(data.timeline);
+          console.log('✅ Timeline data restored');
+        }
+        
+        console.log('🎬 Combined animation loaded successfully');
+      } 
+      // Legacy format - just timeline data
+      else if (data.rows) {
+        console.log('📁 Loading legacy timeline file');
+        if (timeline && timeline.setModel) {
+          timeline.setModel(data);
+        }
+      }
+      // Unknown format
+      else {
+        console.warn('⚠️ Unknown file format');
+        alert('Invalid animation file format');
       }
     });
   };

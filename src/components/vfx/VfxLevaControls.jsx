@@ -8,7 +8,6 @@ import fileManager from '../timeline/fileManager';
 import { getVfxValues } from './VfxParameters.js';
 import { useVfxSettings } from '../../contexts/VfxSettingsContext.jsx';
 
-
 // Debug flag for real-time updates
 const DEBUG = false;
 
@@ -19,10 +18,9 @@ const VfxLevaControls = () => {
   // ✅ SHARED: Use shared VFX settings context
   const { vfxSettings, updateVfxSettings } = useVfxSettings();
 
-  // ✅ VFX-FOCUSED: No transform controls - only effect parameters
-  // Transform controls removed - handled by timeline mode only
-
-  const particleControls = useControls("✨ Particles", {
+  // ✅ FIXED: Create config object first, then use it in useControls (like working timelineLevaControl.jsx)
+  const levaConfig = useMemo(() => ({
+    // Particles
     pCount: { value: vfxValues.pCount, min: 50, max: 2000, step: 10 },
     duration: { value: vfxValues.duration, min: 0.5, max: 10.0, step: 0.1 },
     pSize: { 
@@ -32,33 +30,30 @@ const VfxLevaControls = () => {
       step: 0.01,
       label: 'Particle Size (real-time)'
     },
-    spread: { value: vfxValues.spread, min: 0.5, max: 10, step: 0.1 },
-    pAge: { value: vfxValues.pAge, min: 0.1, max: 3.0, step: 0.1 },
-    sizeVariation: { value: vfxValues.sizeVariation, min: 0.0, max: 1.0, step: 0.1 },
-    timeVariation: { value: vfxValues.timeVariation, min: 0.0, max: 1.0, step: 0.1 }
-  });
+    spread: { value: getVfxValues().spread, min: 0.5, max: 10, step: 0.1 },
+    pAge: { value: getVfxValues().pAge, min: 0.1, max: 3.0, step: 0.1 },
+    sizeVariation: { value: getVfxValues().sizeVariation, min: 0.0, max: 1.0, step: 0.1 },
+    timeVariation: { value: getVfxValues().timeVariation, min: 0.0, max: 1.0, step: 0.1 },
 
-  const colorControls = useControls("🎨 Colors & Effects", {
-    color: { value: vfxValues.color },
-    colorEnd: { value: vfxValues.colorEnd },
-    useGradient: { value: vfxValues.useGradient },
+    // Colors & Effects
+    color: { value: getVfxValues().color },
+    colorEnd: { value: getVfxValues().colorEnd },
+    useGradient: { value: getVfxValues().useGradient },
     opacity: { value: vfxValues.opacity, min: 0.0, max: 1.0, step: 0.1 },
     blendMode: { 
       value: vfxValues.blendMode,
       options: { 'Additive': 0, 'Normal': 1, 'Multiply': 2, 'Subtractive': 3 }
-    }
-  });
+    },
 
-  const physicsControls = useControls("⚡ Physics", {
+    // Physics
     gravity: { value: vfxValues.gravity, min: -15.0, max: 15.0, step: 0.1 },
     turbulence: { value: vfxValues.turbulence, min: 0.0, max: 5.0, step: 0.1 },
     directionalForceX: { value: vfxValues.directionalForceX, min: -10.0, max: 10.0, step: 0.1 },
     directionalForceY: { value: vfxValues.directionalForceY, min: -10.0, max: 10.0, step: 0.1 },
     directionalForceZ: { value: vfxValues.directionalForceZ, min: -10.0, max: 10.0, step: 0.1 },
-    streakLength: { value: vfxValues.streakLength, min: 0.0, max: 2.0, step: 0.1 }
-  });
+    streakLength: { value: vfxValues.streakLength, min: 0.0, max: 2.0, step: 0.1 },
 
-  const shapeControls = useControls("🔺 Shape & Texture", {
+    // Shape & Texture
     shape: {
       value: vfxValues.shape,
       options: ['explosion', 'sphere', 'box', 'cone', 'circle', 'square', 'spiral', 'wave', 'glb', 'model']
@@ -75,11 +70,13 @@ const VfxLevaControls = () => {
       options: { 'Circle': 'Circle', 'Heart': 'Heart', 'Point': 'Point', 'Point Cross': 'Point Cross', 'Point Cross 2': 'Point Cross 2', 'Ring': 'Ring', 'Star': 'Star', 'Star 2': 'Star 2' }
     },
     motionBlur: { value: vfxValues.motionBlur }
-  });
+  }), [vfxValues]);
 
-  // Combine all VFX controls (no transforms)
+  const [allVfxControls, setAllVfxControls] = useControls('VFX Controls', () => levaConfig);
+
+  // ✅ FIXED: Local values for VfxEngine (includes default transforms)
   const allVfxValues = useMemo(() => ({
-    // Default transform values (not controllable in VFX mode)
+    // Default transform values (for VFX-only mode)
     positionX: vfxValues.positionX,
     positionY: vfxValues.positionY,
     positionZ: vfxValues.positionZ,
@@ -87,12 +84,9 @@ const VfxLevaControls = () => {
     rotationY: vfxValues.rotationY,
     rotationZ: vfxValues.rotationZ,
     scale: vfxValues.scale,
-    // VFX effect parameters only
-    ...particleControls,
-    ...colorControls,
-    ...physicsControls,
-    ...shapeControls
-  }), [particleControls, colorControls, physicsControls, shapeControls]);
+    // VFX effect parameters from live controls
+    ...allVfxControls
+  }), [allVfxControls, vfxValues]);
 
   // ✅ REAL-TIME: VFX trigger for animation playback
   const actionControls = useControls("🚀 Actions", {
@@ -107,40 +101,44 @@ const VfxLevaControls = () => {
     }),
     'Debug Values': button(() => {
       console.log('🔍 Current VFX Values:', allVfxValues);
+      console.log('🔍 Live VFX Controls:', allVfxControls);
       console.log('🔍 Parameters count:', Object.keys(allVfxValues).length);
     })
   });
 
-  // ✅ VFX-FOCUSED: No transform reset buttons since transforms aren't controllable
-  // Removed Quick Transform controls - handled by timeline mode only
-
-  // ✅ FILE: Operations for saving/loading VFX settings
-  const fileControls = useControls('💾 File Operations', {
+  // ✅ SIMPLE: File operations using context methods
+  useControls('💾 File Operations', {
     'Save Settings': button(() => {
-      fileManager.saveJSON(allVfxValues, 'vfx-settings.json');
+      const vfxData = {
+        vfxSettings: allVfxControls
+      };
+      
+      fileManager.saveJSON(vfxData, 'vfx-settings.json');
+      console.log('💾 VFX settings saved');
     }),
     'Load Settings': button(() => {
       if (fileInputRef.current) fileInputRef.current.click();
     })
   });
 
-  // ✅ SHARED: Update shared VFX settings whenever controls change
+  // ✅ FIXED: Only update shared context with VFX effect parameters (NO transforms)
   useEffect(() => {
-    updateVfxSettings(allVfxValues);
-  }, [allVfxValues, updateVfxSettings]);
+    updateVfxSettings(allVfxControls);
+  }, [allVfxControls, updateVfxSettings]);
 
   // Debug effect for real-time updates
   useEffect(() => {
     if (DEBUG) {
       console.log('🔄 Real-time VFX update:', {
-        pSize: allVfxValues.pSize,
-        pCount: allVfxValues.pCount,
-        gravity: allVfxValues.gravity,
-        color: allVfxValues.color,
+        pSize: allVfxControls.pSize,
+        pCount: allVfxControls.pCount,
+        gravity: allVfxControls.gravity,
+        color: allVfxControls.color,
+        shape: allVfxControls.shape,
         timestamp: Date.now()
       });
     }
-  }, [allVfxValues]);
+  }, [allVfxControls]);
 
   // ✅ REAL-TIME: Always use current control values for live updates
   const finalVfxValues = useMemo(() => {
@@ -153,18 +151,64 @@ const VfxLevaControls = () => {
     return baseValues;
   }, [allVfxValues, vfxValues]);
 
-  // File import handler
+  // ✅ EXACT TIMELINE PATTERN: File import copying timeline logic exactly
   const handleImport = (e) => {
     const file = e.target.files[0];
     if (!file) return;
     
-    fileManager.loadJSON(file, (loadedValues) => {
-      // Update VFX values with loaded settings
-      setVfxValues({ ...loadedValues, trigger: true });
+    fileManager.loadJSON(file, (data) => {
+      console.log('📂 Raw loaded data:', data);
+      console.log('📂 Data keys:', Object.keys(data || {}));
+      // ✅ EXACT COPY: Check if it's the new structured format (like timeline)
+      if (data.vfxSettings) {
+        console.log('� Loading structured VFX settings file');
+        
+        // ✅ EXACT COPY: Update VFX settings directly like timeline
+        if (updateVfxSettings) {
+          updateVfxSettings(data.vfxSettings);
+          console.log('✅ VFX settings restored');
+        }
+        
+          // Update local controls to reflect loaded values
+          console.log('📁 About to call setAllVfxControls with:', data.vfxSettings);
+          
+          // ✅ FILTER: Remove transform values that don't belong in Leva controls
+          const { positionX, positionY, positionZ, rotationX, rotationY, rotationZ, scale, ...vfxOnlySettings } = data.vfxSettings;
+          console.log('📁 Filtered VFX settings (no transforms):', vfxOnlySettings);
+          
+          setAllVfxControls(vfxOnlySettings);
+          console.log('✅ Local controls updated');
+          
+          console.log('🎬 VFX settings loaded successfully');
+      } 
+      // ✅ EXACT COPY: Legacy format - direct VFX data (like timeline rows check)
+      else if (data.pCount || data.color) {
+        console.log('📁 Loading legacy VFX settings file');
+        
+        if (updateVfxSettings) {
+          updateVfxSettings(data);
+          console.log('✅ Legacy VFX settings restored');
+        }
+        
+        // Update local controls
+        const { positionX, positionY, positionZ, rotationX, rotationY, rotationZ, scale, ...legacyVfxSettings } = data;
+        setAllVfxControls(legacyVfxSettings);
+      }
+      // ✅ EXACT COPY: Unknown format (like timeline)
+      else {
+        console.warn('⚠️ Unknown VFX file format');
+        alert('Invalid VFX settings file format');
+      }
+      
+      // Trigger animation to show loaded effect
+      setVfxValues(prev => ({ ...prev, trigger: true }));
       setTimeout(() => {
         setVfxValues(prev => ({ ...prev, trigger: false }));
       }, 100);
     });
+    
+    // Reset file input
+    e.target.value = '';
   };
 
   // Canvas styles
