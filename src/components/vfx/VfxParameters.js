@@ -56,7 +56,18 @@ export const FIXED_VFX_SETTINGS = {
   gravity: 0,
   turbulence: 0,
   particleTexture: 'Circle',
-  blendMode: 0
+  blendMode: 0,
+  
+  // === TORNADO SETTINGS ===
+  tornadoEnabled: false,
+  tornadoHeight: 8.0,
+  verticalSpeed: 1.0,
+  rotationSpeed: 1.0,
+  vortexStrength: 1.0,
+  spiralSpin: 2.0,
+  baseDiameter: 0.5,
+  topDiameter: 3.0,
+  heightColorGradient: false
 };
 
 // Helper functions (removed complex logic)
@@ -214,6 +225,17 @@ export const getVfxValues = () => {
     // Animation parameters
     animationPreset: 'none',
     particleTexture: 'Circle',
-    motionBlur: false
+    motionBlur: false,
+
+    // === TORNADO PARAMETERS ===
+    tornadoEnabled: false,
+    tornadoHeight: 8.0,
+    verticalSpeed: 1.0,
+    rotationSpeed: 1.0,
+    vortexStrength: 1.0,
+    spiralSpin: 2.0,
+    baseDiameter: 0.5,
+    topDiameter: 3.0,
+    heightColorGradient: false
   };
 };

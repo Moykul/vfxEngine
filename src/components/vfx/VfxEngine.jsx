@@ -13,6 +13,7 @@ import vfxFragmentShader from '../../shaders/vfxShaders/fragment.glsl';
 // Create shader material
 const VFXMaterial = shaderMaterial(
   {
+    // === EXISTING UNIFORMS (keep all of these) ===
     uSize: 0.1,
     uResolution: new THREE.Vector2(1024, 1024),
     uTexture: null,
@@ -26,7 +27,18 @@ const VFXMaterial = shaderMaterial(
     uGravity: 0.0,
     uUseGradient: 0.0,
     uMotionBlur: 0.0,
-    uOpacity: 1.0 
+    uOpacity: 1.0,
+    
+    // === NEW TORNADO UNIFORMS ===
+    uTornadoEnabled: 0.0,
+    uTornadoHeight: 8.0,
+    uVerticalSpeed: 1.0,
+    uRotationSpeed: 1.0,
+    uVortexStrength: 1.0,
+    uSpiralSpin: 2.0,
+    uBaseDiameter: 0.5,
+    uTopDiameter: 3.0,
+    uHeightColorGradient: 0.0
   },
   vfxVertexShader,
   vfxFragmentShader
@@ -79,6 +91,17 @@ const VfxEngine = ({
   particleTexture = 'Circle',
   motionBlur = false,
   
+  // === NEW TORNADO PROPS ===
+  tornadoEnabled = false,
+  tornadoHeight = 8.0,
+  verticalSpeed = 1.0,
+  rotationSpeed = 1.0,
+  vortexStrength = 1.0,
+  spiralSpin = 2.0,
+  baseDiameter = 0.5,
+  topDiameter = 3.0,
+  heightColorGradient = false,
+  
   // Control props
   onComplete,
   
@@ -97,110 +120,157 @@ const VfxEngine = ({
   const { size: canvasSize } = useThree();
   const { textures } = useVfxTextures();
 
-  // ✅ SIMPLIFIED: Single effective values source - no complex fallback logic
+  // ✅ CORRECTED: Include tornado values in effectiveValues
   const effectiveValues = useMemo(() => {
     // If allVfxValues provided, use it directly
     if (allVfxValues) {
       return allVfxValues;
     }
     
-    // Otherwise use individual props
+    // Otherwise use individual props INCLUDING tornado props
     return { 
       positionX, positionY, positionZ, rotationX, rotationY, rotationZ, scale, opacity, 
       color, colorEnd, useGradient, blendMode, pCount, duration, 
       pSize, spread, pAge, gravity, directionalForceX, 
       directionalForceY, directionalForceZ, turbulence, streakLength, shape, 
       shapeHeight, shapeAngle, heightMultiplier, sizeVariation, timeVariation, 
-      animationPreset, particleTexture, motionBlur 
+      animationPreset, particleTexture, motionBlur,
+      // === TORNADO VALUES ===
+      tornadoEnabled, tornadoHeight, verticalSpeed, rotationSpeed, vortexStrength,
+      spiralSpin, baseDiameter, topDiameter, heightColorGradient
     };
   }, [allVfxValues, positionX, positionY, positionZ, rotationX, rotationY, rotationZ, 
       scale, opacity, color, colorEnd, useGradient, blendMode, pCount, 
       duration, pSize, spread, pAge, gravity, 
       directionalForceX, directionalForceY, directionalForceZ, turbulence, 
       streakLength, shape, shapeHeight, shapeAngle, heightMultiplier, 
-      sizeVariation, timeVariation, animationPreset, particleTexture, motionBlur]);
+      sizeVariation, timeVariation, animationPreset, particleTexture, motionBlur,
+      // === TORNADO DEPENDENCIES ===
+      tornadoEnabled, tornadoHeight, verticalSpeed, rotationSpeed, vortexStrength,
+      spiralSpin, baseDiameter, topDiameter, heightColorGradient]);
 
-    // Fallback geometry helper (declare before use)
-    const createFallbackGeometry = useMemo(() => {
-      return () => {
+  // ✅ CORRECTED: Fallback geometry with aHeightFactor
+  const createFallbackGeometry = useMemo(() => {
+    return () => {
+      const geo = new THREE.BufferGeometry();
+      const positions = new Float32Array([0, 0, 0, 1, 0, 0, -1, 0, 0]);
+      const sizes = new Float32Array([1, 1, 1]);
+      const timeMultipliers = new Float32Array([1, 1, 1]);
+      const heightFactors = new Float32Array([0.5, 0.5, 0.5]); // NEW
+    
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      geo.setAttribute('aSize', new THREE.Float32BufferAttribute(sizes, 1));
+      geo.setAttribute('aTimeMultiplier', new THREE.Float32BufferAttribute(timeMultipliers, 1));
+      geo.setAttribute('aHeightFactor', new THREE.Float32BufferAttribute(heightFactors, 1)); // NEW
+      geo.computeBoundingSphere();
+    
+      return geo;
+    };
+  }, []);
+
+  // Geometry state generated asynchronously (supports GLB and avoids Promise issues)
+  const [geometry, setGeometry] = useState(() => createFallbackGeometry());
+
+  // ✅ CORRECTED: Geometry generation with tornado support
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        // ✅ CORRECTED: Pass tornado options to generatePositions
+        const tornadoOptions = effectiveValues.tornadoEnabled ? {
+          tornadoHeight: effectiveValues.tornadoHeight,
+          spiralBranches: 3, // Could be made configurable later
+          spiralSpin: effectiveValues.spiralSpin,
+          spiralRadius: 2.0, // Could be made configurable later
+          baseDiameter: effectiveValues.baseDiameter,
+          topDiameter: effectiveValues.topDiameter,
+          spiralRandomness: 0.2, // Could be made configurable later
+          spiralRandomnessPower: 3, // Could be made configurable later
+          layerCount: 1, // Could be made configurable later
+          layerOffset: 0.5, // Could be made configurable later
+          vortexStrength: effectiveValues.vortexStrength
+        } : {};
+
+        const positions = await generatePositions(
+          effectiveValues.shape,
+          effectiveValues.pCount,
+          effectiveValues.spread,
+          effectiveValues.shapeHeight || 2.0,
+          effectiveValues.shapeAngle || 0,
+          effectiveValues.heightMultiplier || 1.0,
+          tornadoOptions // ✅ CORRECTED: Pass tornado options
+        );
+
+        if (!positions || !positions.length) {
+          if (!cancelled) setGeometry(createFallbackGeometry());
+          return;
+        }
+
+        // ✅ CORRECTED: Generate attributes including aHeightFactor
+        const sizes = new Float32Array(effectiveValues.pCount);
+        const timeMultipliers = new Float32Array(effectiveValues.pCount);
+        const heightFactors = new Float32Array(effectiveValues.pCount); // NEW
+        
+        for (let i = 0; i < effectiveValues.pCount; i++) {
+          sizes[i] = Math.random() * (effectiveValues.sizeVariation || 0.5) + (1 - (effectiveValues.sizeVariation || 0.5) / 2);
+          timeMultipliers[i] = 1 + Math.random() * (effectiveValues.timeVariation || 0.4);
+          
+          // ✅ CORRECTED: Calculate height factor for tornado effects
+          if (effectiveValues.tornadoEnabled && effectiveValues.shape === 'tornado') {
+            // For tornado shapes, calculate height factor based on Y position
+            const y = positions[i * 3 + 1]; // Y position
+            const tornadoHeight = effectiveValues.tornadoHeight || 8.0;
+            heightFactors[i] = Math.max(0, Math.min(1, y / tornadoHeight));
+          } else {
+            // For non-tornado shapes, use neutral height factor
+            heightFactors[i] = 0.5;
+          }
+        }
+
         const geo = new THREE.BufferGeometry();
-        const positions = new Float32Array([0, 0, 0, 1, 0, 0, -1, 0, 0]);
-        const sizes = new Float32Array([1, 1, 1]);
-        const timeMultipliers = new Float32Array([1, 1, 1]);
-      
         geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
         geo.setAttribute('aSize', new THREE.Float32BufferAttribute(sizes, 1));
         geo.setAttribute('aTimeMultiplier', new THREE.Float32BufferAttribute(timeMultipliers, 1));
+        geo.setAttribute('aHeightFactor', new THREE.Float32BufferAttribute(heightFactors, 1)); // NEW
         geo.computeBoundingSphere();
-      
-        return geo;
-      };
-    }, []);
 
-    // Geometry state generated asynchronously (supports GLB and avoids Promise issues)
-    const [geometry, setGeometry] = useState(() => createFallbackGeometry());
+        if (!cancelled) setGeometry(geo);
+      } catch (error) {
+        console.error('Error creating geometry:', error);
+        if (!cancelled) setGeometry(createFallbackGeometry());
+      }
+    })();
 
-    useEffect(() => {
-      let cancelled = false;
-      (async () => {
-        try {
-          const positions = await generatePositions(
-            effectiveValues.shape,
-            effectiveValues.pCount,
-            effectiveValues.spread,
-            effectiveValues.shapeHeight || 2.0,
-            effectiveValues.shapeAngle || 0,
-            effectiveValues.heightMultiplier || 1.0
-          );
-
-          if (!positions || !positions.length) {
-            if (!cancelled) setGeometry(createFallbackGeometry());
-            return;
-          }
-
-          const sizes = new Float32Array(effectiveValues.pCount);
-          const timeMultipliers = new Float32Array(effectiveValues.pCount);
-          for (let i = 0; i < effectiveValues.pCount; i++) {
-            sizes[i] = Math.random() * (effectiveValues.sizeVariation || 0.5) + (1 - (effectiveValues.sizeVariation || 0.5) / 2);
-            timeMultipliers[i] = 1 + Math.random() * (effectiveValues.timeVariation || 0.4);
-          }
-
-          const geo = new THREE.BufferGeometry();
-          geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-          geo.setAttribute('aSize', new THREE.Float32BufferAttribute(sizes, 1));
-          geo.setAttribute('aTimeMultiplier', new THREE.Float32BufferAttribute(timeMultipliers, 1));
-          geo.computeBoundingSphere();
-
-          if (!cancelled) setGeometry(geo);
-        } catch (error) {
-          console.error('Error creating geometry:', error);
-          if (!cancelled) setGeometry(createFallbackGeometry());
-        }
-      })();
-
-      return () => { cancelled = true; };
-    }, [
-      effectiveValues.shape,
-      effectiveValues.pCount,
-      effectiveValues.spread,
-      effectiveValues.shapeHeight,
-      effectiveValues.shapeAngle,
-      effectiveValues.heightMultiplier,
-      effectiveValues.sizeVariation,
-      effectiveValues.timeVariation,
-      createFallbackGeometry
-    ]);
+    return () => { cancelled = true; };
+  }, [
+    effectiveValues.shape,
+    effectiveValues.pCount,
+    effectiveValues.spread,
+    effectiveValues.shapeHeight,
+    effectiveValues.shapeAngle,
+    effectiveValues.heightMultiplier,
+    effectiveValues.sizeVariation,
+    effectiveValues.timeVariation,
+    // ✅ CORRECTED: Add tornado dependencies
+    effectiveValues.tornadoEnabled,
+    effectiveValues.tornadoHeight,
+    effectiveValues.spiralSpin,
+    effectiveValues.baseDiameter,
+    effectiveValues.topDiameter,
+    effectiveValues.vortexStrength,
+    createFallbackGeometry
+  ]);
 
   // Handle animation triggers only (not real-time updates)
   useEffect(() => {
     if (effectiveValues.trigger) {
-      console.log('🚀 VfxEngine: Animation trigger fired');
+      console.log('🚀 VfxEngine: Animation trigger fired', effectiveValues.tornadoEnabled ? '(Tornado mode)' : '');
       setIsPlaying(true);
       startTimeRef.current = performance.now() / 1000;
     }
-  }, [effectiveValues.trigger]);
+  }, [effectiveValues.trigger, effectiveValues.tornadoEnabled]);
 
-  // ✅ REAL-TIME: Update material uniforms for live feedback
+  // ✅ CORRECTED: Update material uniforms including tornado uniforms
   useEffect(() => {
     if (!materialRef.current) return;
 
@@ -230,6 +300,17 @@ const VfxEngine = ({
     material.uniforms.uMotionBlur.value = effectiveValues.motionBlur ? 1.0 : 0.0;
     material.uniforms.uOpacity.value = effectiveValues.opacity || 1.0;
     
+    // ✅ CORRECTED: NEW TORNADO UNIFORM UPDATES
+    material.uniforms.uTornadoEnabled.value = effectiveValues.tornadoEnabled ? 1.0 : 0.0;
+    material.uniforms.uTornadoHeight.value = effectiveValues.tornadoHeight || 8.0;
+    material.uniforms.uVerticalSpeed.value = effectiveValues.verticalSpeed || 1.0;
+    material.uniforms.uRotationSpeed.value = effectiveValues.rotationSpeed || 1.0;
+    material.uniforms.uVortexStrength.value = effectiveValues.vortexStrength || 1.0;
+    material.uniforms.uSpiralSpin.value = effectiveValues.spiralSpin || 2.0;
+    material.uniforms.uBaseDiameter.value = effectiveValues.baseDiameter || 0.5;
+    material.uniforms.uTopDiameter.value = effectiveValues.topDiameter || 3.0;
+    material.uniforms.uHeightColorGradient.value = effectiveValues.heightColorGradient ? 1.0 : 0.0;
+    
     // Texture - update in real-time
     if (textures.length > 0) {
       const texture = textures.find(t => t.name === (effectiveValues.particleTexture || 'Circle')) || textures[0];
@@ -237,6 +318,16 @@ const VfxEngine = ({
     }
 
     material.needsUpdate = true;
+    
+    // Debug tornado mode changes
+    if (effectiveValues.tornadoEnabled) {
+      console.log('🌪️ Tornado uniforms updated:', {
+        enabled: effectiveValues.tornadoEnabled,
+        height: effectiveValues.tornadoHeight,
+        rotationSpeed: effectiveValues.rotationSpeed,
+        vortexStrength: effectiveValues.vortexStrength
+      });
+    }
   }, [effectiveValues, canvasSize, textures]);
 
   // Animation loop
@@ -259,7 +350,7 @@ const VfxEngine = ({
       }
     } else {
       // Design mode - show particles
-      materialRef.current.uniforms.uProgress.value = 0.3;
+      materialRef.current.uniforms.uProgress.value = effectiveValues.tornadoEnabled ? 0.5 : 0.3;
       materialRef.current.uniforms.uTime.value = elapsedTime;
     }
   });

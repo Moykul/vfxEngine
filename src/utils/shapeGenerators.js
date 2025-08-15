@@ -158,6 +158,79 @@ export const generateFlowFieldMesh = (count, spread, glbPath = null) => {
 };
 
 /**
+ * Generate particle positions for tornado pattern
+ */
+export const generateTornado = (
+  count, 
+  tornadoHeight = 8.0, 
+  spiralBranches = 3, 
+  spiralSpin = 2.0, 
+  spiralRadius = 2.0, 
+  baseDiameter = 0.5, 
+  topDiameter = 3.0, 
+  spiralRandomness = 0.2, 
+  spiralRandomnessPower = 3, 
+  layerCount = 1, 
+  layerOffset = 0.5, 
+  vortexStrength = 1.0
+) => {
+  const positions = new Float32Array(count * 3);
+  
+  for (let i = 0; i < count; i++) {
+    const i3 = i * 3;
+    
+    // Determine which layer this particle belongs to
+    const layer = Math.floor(i / (count / layerCount));
+    const layerProgress = layer / Math.max(1, layerCount - 1);
+    
+    // Height position (0 to tornadoHeight) with bias toward bottom
+    const heightProgress = Math.pow(Math.random(), 0.7); // Bias toward bottom
+    const y = heightProgress * tornadoHeight;
+    
+    // Tornado diameter interpolation (narrower at bottom, wider at top)
+    const diameterAtHeight = baseDiameter + (topDiameter - baseDiameter) * heightProgress;
+    
+    // Base radius for this particle
+    let radius = Math.random() * diameterAtHeight * spiralRadius;
+    
+    // Add layer offset
+    radius += layerProgress * layerOffset;
+    
+    // Vortex effect - particles closer to center move faster vertically
+    const vortexInfluence = (1 - radius / (spiralRadius * diameterAtHeight)) * vortexStrength;
+    
+    // Spiral calculation (inspired by galaxy but vertical)
+    // Increase spiral intensity with height for tornado effect
+    const spiralAngle = radius * spiralSpin * (heightProgress + 0.1);
+    
+    // Branch angle - distribute particles across spiral arms
+    const branchAngle = (i % spiralBranches) / spiralBranches * Math.PI * 2;
+    
+    // Layer rotation offset
+    const layerRotation = layer * Math.PI * 2 / layerCount;
+    
+    // Total rotation angle
+    const totalAngle = branchAngle + spiralAngle + layerRotation;
+    
+    // Add controlled randomness (similar to galaxy)
+    const randomFactor = spiralRandomness * radius;
+    const randomX = Math.pow(Math.random(), spiralRandomnessPower) * 
+                   (Math.random() < 0.5 ? 1 : -1) * randomFactor;
+    const randomY = Math.pow(Math.random(), spiralRandomnessPower) * 
+                   (Math.random() < 0.5 ? 1 : -1) * randomFactor * 0.3; // Less Y randomness
+    const randomZ = Math.pow(Math.random(), spiralRandomnessPower) * 
+                   (Math.random() < 0.5 ? 1 : -1) * randomFactor;
+    
+    // Final positions
+    positions[i3] = Math.cos(totalAngle) * radius + randomX;
+    positions[i3 + 1] = y + randomY;
+    positions[i3 + 2] = Math.sin(totalAngle) * radius + randomZ;
+  }
+  
+  return positions;
+};
+
+/**
  * Generate particle positions for explosion pattern (radial burst)
  */
 export const generateExplosion = (count, radius, minRadius = null) => {
@@ -419,10 +492,37 @@ export const generatePositions = async (shape, count, radius, height = 2, angle 
     frequency = 3,
     amplitude = 0.5,
     reverse = false,
-    glbPath = '/models/sqMesh.glb' // Default path for GLB
+    glbPath = '/models/sqMesh.glb', // Default path for GLB
+    // === TORNADO PARAMETERS ===
+    tornadoHeight = 8.0,
+    spiralBranches = 3,
+    spiralSpin = 2.0,
+    spiralRadius = 2.0,
+    baseDiameter = 0.5,
+    topDiameter = 3.0,
+    spiralRandomness = 0.2,
+    spiralRandomnessPower = 3,
+    layerCount = 1,
+    layerOffset = 0.5,
+    vortexStrength = 1.0
   } = options;
   
   switch (shape) {
+    case 'tornado':
+      return generateTornado(
+        count, 
+        tornadoHeight, 
+        spiralBranches, 
+        spiralSpin, 
+        spiralRadius, 
+        baseDiameter, 
+        topDiameter, 
+        spiralRandomness, 
+        spiralRandomnessPower, 
+        layerCount, 
+        layerOffset, 
+        vortexStrength
+      );
     case 'glb':
     case 'model':
       // Handle GLB asynchronously
@@ -468,7 +568,7 @@ export const generatePositionsSync = (shape, count, radius, height = 2, angle = 
 export const getAvailableShapes = () => {
   return [
     'explosion', 'sphere', 'box', 'cone', 'circle', 
-    'square', 'spiral', 'wave', 'glb', 'model'
+    'square', 'spiral', 'wave', 'glb', 'model', 'tornado'
   ];
 };
 
@@ -493,6 +593,7 @@ export default {
   generatePositions,
   generatePositionsSync,
   generateGLB,
+  generateTornado,
   generateExplosion,
   generateSphere,
   generateBox,

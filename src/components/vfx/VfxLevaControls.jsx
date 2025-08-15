@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useMemo, useEffect } from 'react';
-import { useControls, button } from 'leva';
+import { useControls, button, folder } from 'leva';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Grid, Stats } from '@react-three/drei';
 import { Suspense } from 'react';
@@ -20,56 +20,111 @@ const VfxLevaControls = () => {
 
   // ✅ FIXED: Create config object first, then use it in useControls (like working timelineLevaControl.jsx)
   const levaConfig = useMemo(() => ({
-    // Particles
-    pCount: { value: vfxValues.pCount, min: 50, max: 2000, step: 10 },
-    duration: { value: vfxValues.duration, min: 0.5, max: 10.0, step: 0.1 },
-    pSize: { 
-      value: vfxValues.pSize, 
-      min: 0.01, 
-      max: 1.0, 
-      step: 0.01,
-      label: 'Particle Size (real-time)'
-    },
-    spread: { value: getVfxValues().spread, min: 0.5, max: 10, step: 0.1 },
-    pAge: { value: getVfxValues().pAge, min: 0.1, max: 3.0, step: 0.1 },
-    sizeVariation: { value: getVfxValues().sizeVariation, min: 0.0, max: 1.0, step: 0.1 },
-    timeVariation: { value: getVfxValues().timeVariation, min: 0.0, max: 1.0, step: 0.1 },
+    // === PARTICLES ===
+    'Particles': folder({
+      pCount: { value: vfxValues.pCount, min: 50, max: 2000, step: 10 },
+      duration: { value: vfxValues.duration, min: 0.5, max: 10.0, step: 0.1 },
+      pSize: { 
+        value: vfxValues.pSize, 
+        min: 0.01, 
+        max: 1.0, 
+        step: 0.01,
+        label: 'Particle Size (real-time)'
+      },
+      spread: { value: getVfxValues().spread, min: 0.5, max: 10, step: 0.1 },
+      pAge: { value: getVfxValues().pAge, min: 0.1, max: 3.0, step: 0.1 },
+      sizeVariation: { value: getVfxValues().sizeVariation, min: 0.0, max: 1.0, step: 0.1 },
+      timeVariation: { value: getVfxValues().timeVariation, min: 0.0, max: 1.0, step: 0.1 }
+    }),
 
-    // Colors & Effects
-    color: { value: getVfxValues().color },
-    colorEnd: { value: getVfxValues().colorEnd },
-    useGradient: { value: getVfxValues().useGradient },
-    opacity: { value: vfxValues.opacity, min: 0.0, max: 1.0, step: 0.1 },
-    blendMode: { 
-      value: vfxValues.blendMode,
-      options: { 'Additive': 0, 'Normal': 1, 'Multiply': 2, 'Subtractive': 3 }
-    },
+    // === COLORS & EFFECTS ===
+    'Colors & Effects': folder({
+      color: { value: getVfxValues().color },
+      colorEnd: { value: getVfxValues().colorEnd },
+      useGradient: { value: getVfxValues().useGradient },
+      opacity: { value: vfxValues.opacity, min: 0.0, max: 1.0, step: 0.1 },
+      blendMode: { 
+        value: vfxValues.blendMode,
+        options: { 'Additive': 0, 'Normal': 1, 'Multiply': 2, 'Subtractive': 3 }
+      }
+    }),
 
-    // Physics
-    gravity: { value: vfxValues.gravity, min: -15.0, max: 15.0, step: 0.1 },
-    turbulence: { value: vfxValues.turbulence, min: 0.0, max: 5.0, step: 0.1 },
-    directionalForceX: { value: vfxValues.directionalForceX, min: -10.0, max: 10.0, step: 0.1 },
-    directionalForceY: { value: vfxValues.directionalForceY, min: -10.0, max: 10.0, step: 0.1 },
-    directionalForceZ: { value: vfxValues.directionalForceZ, min: -10.0, max: 10.0, step: 0.1 },
-    streakLength: { value: vfxValues.streakLength, min: 0.0, max: 2.0, step: 0.1 },
+    // === PHYSICS ===
+    'Physics': folder({
+      gravity: { value: vfxValues.gravity, min: -15.0, max: 15.0, step: 0.1 },
+      turbulence: { value: vfxValues.turbulence, min: 0.0, max: 5.0, step: 0.1 },
+      directionalForceX: { value: vfxValues.directionalForceX, min: -10.0, max: 10.0, step: 0.1 },
+      directionalForceY: { value: vfxValues.directionalForceY, min: -10.0, max: 10.0, step: 0.1 },
+      directionalForceZ: { value: vfxValues.directionalForceZ, min: -10.0, max: 10.0, step: 0.1 },
+      streakLength: { value: vfxValues.streakLength, min: 0.0, max: 2.0, step: 0.1 }
+    }),
 
-    // Shape & Texture
-    shape: {
-      value: vfxValues.shape,
-      options: ['explosion', 'sphere', 'box', 'cone', 'circle', 'square', 'spiral', 'wave', 'glb', 'model']
-    },
-    shapeHeight: { value: vfxValues.shapeHeight, min: 0.5, max: 10.0, step: 0.1 },
-    shapeAngle: { value: vfxValues.shapeAngle, min: 0, max: 360, step: 1 },
-    heightMultiplier: { value: vfxValues.heightMultiplier, min: 0.1, max: 5.0, step: 0.1 },
-    animationPreset: {
-      value: vfxValues.animationPreset,
-      options: ['none', 'fadeIn', 'fadeOut', 'spiral', 'burst', 'gravity']
-    },
-    particleTexture: {
-      value: vfxValues.particleTexture,
-      options: { 'Circle': 'Circle', 'Heart': 'Heart', 'Point': 'Point', 'Point Cross': 'Point Cross', 'Point Cross 2': 'Point Cross 2', 'Ring': 'Ring', 'Star': 'Star', 'Star 2': 'Star 2' }
-    },
-    motionBlur: { value: vfxValues.motionBlur }
+    // === SHAPE & TEXTURE ===
+    'Shape & Texture': folder({
+      shape: {
+        value: vfxValues.shape,
+        options: ['explosion', 'sphere', 'box', 'cone', 'circle', 'square', 'spiral', 'wave', 'glb', 'model', 'tornado']
+      },
+      shapeHeight: { value: vfxValues.shapeHeight, min: 0.5, max: 10.0, step: 0.1 },
+      shapeAngle: { value: vfxValues.shapeAngle, min: 0, max: 360, step: 1 },
+      heightMultiplier: { value: vfxValues.heightMultiplier, min: 0.1, max: 5.0, step: 0.1 },
+      animationPreset: {
+        value: vfxValues.animationPreset,
+        options: ['none', 'fadeIn', 'fadeOut', 'spiral', 'burst', 'gravity']
+      },
+      particleTexture: {
+        value: vfxValues.particleTexture,
+        options: { 'Circle': 'Circle', 'Heart': 'Heart', 'Point': 'Point', 'Point Cross': 'Point Cross', 'Point Cross 2': 'Point Cross 2', 'Ring': 'Ring', 'Star': 'Star', 'Star 2': 'Star 2' }
+      },
+      motionBlur: { value: vfxValues.motionBlur }
+    }),
+
+    // === TORNADO CONTROLS ===
+    'Tornado': folder({
+      tornadoEnabled: { 
+        value: getVfxValues().tornadoEnabled,
+        label: '🌪️ Enable Tornado'
+      },
+      tornadoHeight: { 
+        value: getVfxValues().tornadoHeight, 
+        min: 1, max: 20, step: 0.1,
+        label: 'Height'
+      },
+      baseDiameter: { 
+        value: getVfxValues().baseDiameter, 
+        min: 0.1, max: 3, step: 0.1,
+        label: 'Base Width'
+      },
+      topDiameter: { 
+        value: getVfxValues().topDiameter, 
+        min: 0.1, max: 8, step: 0.1,
+        label: 'Top Width'
+      },
+      verticalSpeed: { 
+        value: getVfxValues().verticalSpeed, 
+        min: 0, max: 5, step: 0.1,
+        label: 'Vertical Speed'
+      },
+      rotationSpeed: { 
+        value: getVfxValues().rotationSpeed, 
+        min: 0, max: 10, step: 0.1,
+        label: 'Rotation Speed'
+      },
+      vortexStrength: { 
+        value: getVfxValues().vortexStrength, 
+        min: 0, max: 5, step: 0.1,
+        label: 'Vortex Strength'
+      },
+      spiralSpin: { 
+        value: getVfxValues().spiralSpin, 
+        min: -10, max: 10, step: 0.1,
+        label: 'Spiral Intensity'
+      },
+      heightColorGradient: { 
+        value: getVfxValues().heightColorGradient,
+        label: 'Height Color Gradient'
+      }
+    })
   }), [vfxValues]);
 
   const [allVfxControls, setAllVfxControls] = useControls('VFX Controls', () => levaConfig);
@@ -161,7 +216,7 @@ const VfxLevaControls = () => {
       console.log('📂 Data keys:', Object.keys(data || {}));
       // ✅ EXACT COPY: Check if it's the new structured format (like timeline)
       if (data.vfxSettings) {
-        console.log('� Loading structured VFX settings file');
+        console.log('⚙️ Loading structured VFX settings file');
         
         // ✅ EXACT COPY: Update VFX settings directly like timeline
         if (updateVfxSettings) {
@@ -170,11 +225,11 @@ const VfxLevaControls = () => {
         }
         
           // Update local controls to reflect loaded values
-          console.log('📁 About to call setAllVfxControls with:', data.vfxSettings);
+          console.log('🔍 About to call setAllVfxControls with:', data.vfxSettings);
           
           // ✅ FILTER: Remove transform values that don't belong in Leva controls
           const { positionX, positionY, positionZ, rotationX, rotationY, rotationZ, scale, ...vfxOnlySettings } = data.vfxSettings;
-          console.log('📁 Filtered VFX settings (no transforms):', vfxOnlySettings);
+          console.log('🔍 Filtered VFX settings (no transforms):', vfxOnlySettings);
           
           setAllVfxControls(vfxOnlySettings);
           console.log('✅ Local controls updated');
@@ -183,7 +238,7 @@ const VfxLevaControls = () => {
       } 
       // ✅ EXACT COPY: Legacy format - direct VFX data (like timeline rows check)
       else if (data.pCount || data.color) {
-        console.log('📁 Loading legacy VFX settings file');
+        console.log('🔍 Loading legacy VFX settings file');
         
         if (updateVfxSettings) {
           updateVfxSettings(data);
