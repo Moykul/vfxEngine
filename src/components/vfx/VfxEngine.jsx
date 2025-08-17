@@ -3,7 +3,7 @@ import { useFrame, useThree, extend } from '@react-three/fiber';
 import { shaderMaterial } from '@react-three/drei';
 import * as THREE from 'three';
 import { generatePositions } from '../../utils/shapeGenerators.js';
-import { useVfxTextures } from '../../hooks/index.js';
+import { useVfxTextures, useVfxSprites } from '../../hooks/index.js';
 // FIXED_VFX_SETTINGS import removed to avoid loading VfxParameters.js
 
 // Import shaders
@@ -28,6 +28,8 @@ const VFXMaterial = shaderMaterial(
     uUseGradient: 0.0,
     uMotionBlur: 0.0,
     uOpacity: 1.0,
+    
+    // === REMOVED: Sprite-specific uniforms (no longer needed) ===
     
     // === NEW TORNADO UNIFORMS ===
     uTornadoEnabled: 0.0,
@@ -91,6 +93,8 @@ const VfxEngine = ({
   particleTexture = 'Circle',
   motionBlur = false,
   
+  // === REMOVED: Sprite props (no longer needed) ===
+  
   // === NEW TORNADO PROPS ===
   tornadoEnabled = false,
   tornadoHeight = 8.0,
@@ -104,6 +108,9 @@ const VfxEngine = ({
   
   // Control props
   onComplete,
+  
+  // External resources
+  sprites = [],
   
   // ✅ SIMPLIFIED: Single data source - allVfxValues takes priority
   allVfxValues = null
@@ -120,14 +127,14 @@ const VfxEngine = ({
   const { size: canvasSize } = useThree();
   const { textures } = useVfxTextures();
 
-  // ✅ CORRECTED: Include tornado values in effectiveValues
+  // ✅ CORRECTED: Include tornado values in effectiveValues (removed sprite values)
   const effectiveValues = useMemo(() => {
     // If allVfxValues provided, use it directly
     if (allVfxValues) {
       return allVfxValues;
     }
     
-    // Otherwise use individual props INCLUDING tornado props
+    // Otherwise use individual props INCLUDING tornado props (removed sprite props)
     return { 
       positionX, positionY, positionZ, rotationX, rotationY, rotationZ, scale, opacity, 
       color, colorEnd, useGradient, blendMode, pCount, duration, 
@@ -270,7 +277,7 @@ const VfxEngine = ({
     }
   }, [effectiveValues.trigger, effectiveValues.tornadoEnabled]);
 
-  // ✅ CORRECTED: Update material uniforms including tornado uniforms
+  // ✅ UPDATED: Material uniforms with auto-detect texture logic
   useEffect(() => {
     if (!materialRef.current) return;
 
@@ -311,10 +318,31 @@ const VfxEngine = ({
     material.uniforms.uTopDiameter.value = effectiveValues.topDiameter || 3.0;
     material.uniforms.uHeightColorGradient.value = effectiveValues.heightColorGradient ? 1.0 : 0.0;
     
-    // Texture - update in real-time
+    // ✅ NEW: Auto-detect texture type and apply accordingly
+    const selectedTextureName = effectiveValues.particleTexture || 'Circle';
+    
+    // First, try to find in extended textures (sprites)
+    if (sprites && sprites.length > 0) {
+      const sprite = sprites.find(s => s.name === selectedTextureName);
+      if (sprite) {
+        material.uniforms.uTexture.value = sprite;
+        console.log('🖼️ Using extended texture:', sprite.name, '(Category:', sprite.category + ')');
+        material.needsUpdate = true;
+        return;
+      }
+    }
+    
+    // If not found in sprites, look in basic particle textures
     if (textures.length > 0) {
-      const texture = textures.find(t => t.name === (effectiveValues.particleTexture || 'Circle')) || textures[0];
-      material.uniforms.uTexture.value = texture;
+      const texture = textures.find(t => t.name === selectedTextureName);
+      if (texture) {
+        material.uniforms.uTexture.value = texture;
+        console.log('🔹 Using basic particle texture:', texture.name);
+      } else {
+        // Fallback to first available texture
+        material.uniforms.uTexture.value = textures[0];
+        console.log('⚠️ Texture not found, using fallback:', textures[0].name);
+      }
     }
 
     material.needsUpdate = true;
@@ -328,7 +356,7 @@ const VfxEngine = ({
         vortexStrength: effectiveValues.vortexStrength
       });
     }
-  }, [effectiveValues, canvasSize, textures]);
+  }, [effectiveValues, canvasSize, textures, sprites]);
 
   // Animation loop
   useFrame((state) => {
@@ -365,25 +393,31 @@ const VfxEngine = ({
     }
   };
 
+  // Configure render properties
+  const renderProps = {
+    ref: meshRef,
+    geometry: geometry,
+    position: [effectiveValues.positionX || 0, effectiveValues.positionY || 0, effectiveValues.positionZ || 0],
+    scale: [effectiveValues.scale || 1, effectiveValues.scale || 1, effectiveValues.scale || 1],
+    rotation: [
+      (effectiveValues.rotationX || 0) * Math.PI / 180,
+      (effectiveValues.rotationY || 0) * Math.PI / 180,
+      (effectiveValues.rotationZ || 0) * Math.PI / 180
+    ]
+  };
+
+  // Material props
+  const materialProps = {
+    ref: materialRef,
+    transparent: true,
+    depthWrite: false,
+    blending: getBlendMode(effectiveValues.blendMode || 0),
+    opacity: effectiveValues.opacity || 1.0
+  };
+
   return (
-    <points 
-      ref={meshRef}
-      geometry={geometry}
-      position={[effectiveValues.positionX || 0, effectiveValues.positionY || 0, effectiveValues.positionZ || 0]} 
-      scale={[effectiveValues.scale || 1, effectiveValues.scale || 1, effectiveValues.scale || 1]} 
-      rotation={[
-        (effectiveValues.rotationX || 0) * Math.PI / 180, 
-        (effectiveValues.rotationY || 0) * Math.PI / 180, 
-        (effectiveValues.rotationZ || 0) * Math.PI / 180
-      ]}
-    >
-      <vFXMaterial
-        ref={materialRef}
-        transparent
-        depthWrite={false}
-        blending={getBlendMode(effectiveValues.blendMode || 0)}
-        opacity={effectiveValues.opacity || 1.0}
-      />
+    <points {...renderProps}>
+      <vFXMaterial {...materialProps} />
     </points>
   );
 };

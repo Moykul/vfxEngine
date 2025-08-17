@@ -7,6 +7,7 @@ import VfxEngine from './VfxEngine.jsx';
 import fileManager from '../timeline/fileManager';
 import { getVfxValues } from './VfxParameters.js';
 import { useVfxSettings } from '../../contexts/VfxSettingsContext.jsx';
+import { useVfxSprites } from '../../hooks/index.js';
 
 // Debug flag for real-time updates
 const DEBUG = false;
@@ -17,8 +18,42 @@ const VfxLevaControls = () => {
   
   // ✅ SHARED: Use shared VFX settings context
   const { vfxSettings, updateVfxSettings } = useVfxSettings();
+  
+  // Load all available sprite textures
+  const { sprites, spriteOptions, spriteCategories } = useVfxSprites();
 
-  // ✅ FIXED: Create config object first, then use it in useControls (like working timelineLevaControl.jsx)
+  // ✅ NEW: Combined texture options (basic + extended)
+  const allTextureOptions = useMemo(() => {
+    const options = {};
+    
+    // Add basic particle textures first
+    options['-- BASIC PARTICLES --'] = '';
+    const basicTextures = { 
+      'Circle': 'Circle', 
+      'Heart': 'Heart', 
+      'Point': 'Point', 
+      'Point Cross': 'Point Cross', 
+      'Point Cross 2': 'Point Cross 2', 
+      'Ring': 'Ring', 
+      'Star': 'Star', 
+      'Star 2': 'Star 2' 
+    };
+    Object.assign(options, basicTextures);
+    
+    // Add extended textures by category
+    spriteCategories.forEach(category => {
+      options[`-- ${category.toUpperCase()} --`] = '';
+      sprites
+        .filter(sprite => sprite.category === category)
+        .forEach(sprite => {
+          options[sprite.name] = sprite.name;
+        });
+    });
+    
+    return options;
+  }, [sprites, spriteCategories]);
+
+  // ✅ FIXED: Create config object first, then use it in useControls
   const levaConfig = useMemo(() => ({
     // === PARTICLES ===
     'Particles': folder({
@@ -72,9 +107,11 @@ const VfxLevaControls = () => {
         value: vfxValues.animationPreset,
         options: ['none', 'fadeIn', 'fadeOut', 'spiral', 'burst', 'gravity']
       },
+      // ✅ UPDATED: Combined texture selection
       particleTexture: {
-        value: vfxValues.particleTexture,
-        options: { 'Circle': 'Circle', 'Heart': 'Heart', 'Point': 'Point', 'Point Cross': 'Point Cross', 'Point Cross 2': 'Point Cross 2', 'Ring': 'Ring', 'Star': 'Star', 'Star 2': 'Star 2' }
+        value: vfxValues.particleTexture || 'Circle',
+        options: allTextureOptions,
+        label: 'Texture (Basic + Extended)'
       },
       motionBlur: { value: vfxValues.motionBlur }
     }),
@@ -125,7 +162,8 @@ const VfxLevaControls = () => {
         label: 'Height Color Gradient'
       }
     })
-  }), [vfxValues]);
+    // ✅ REMOVED: Sprites section completely removed
+  }), [vfxValues, allTextureOptions]);
 
   const [allVfxControls, setAllVfxControls] = useControls('VFX Controls', () => levaConfig);
 
@@ -354,6 +392,7 @@ const VfxLevaControls = () => {
           {/* ✅ VfxEngine with clean values */}
           <VfxEngine 
             allVfxValues={finalVfxValues}
+            sprites={sprites}
             onComplete={() => {
               setVfxValues(prev => ({ ...prev, trigger: false }));
             }}
