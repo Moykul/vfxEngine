@@ -4,16 +4,17 @@ import { shaderMaterial } from '@react-three/drei';
 import * as THREE from 'three';
 import { generatePositions } from '../../utils/shapeGenerators.js';
 import { useVfxTextures, useVfxSprites } from '../../hooks/index.js';
+import { useVfxSpritesheets } from '../../hooks/useVfxSpritesheets.js';
 // FIXED_VFX_SETTINGS import removed to avoid loading VfxParameters.js
 
 // Import shaders
 import vfxVertexShader from '../../shaders/vfxShaders/vertex.glsl';
 import vfxFragmentShader from '../../shaders/vfxShaders/fragment.glsl';
 
-// Create shader material
+// Create shader material with spritesheet support
 const VFXMaterial = shaderMaterial(
   {
-    // === EXISTING UNIFORMS (keep all of these) ===
+    // === EXISTING UNIFORMS ===
     uSize: 0.1,
     uResolution: new THREE.Vector2(1024, 1024),
     uTexture: null,
@@ -29,9 +30,16 @@ const VFXMaterial = shaderMaterial(
     uMotionBlur: 0.0,
     uOpacity: 1.0,
     
-    // === REMOVED: Sprite-specific uniforms (no longer needed) ===
+    // === NEW SPRITESHEET UNIFORMS ===
+    uUseSpritesheet: 0.0,        // Enable/disable spritesheet animation
+    uFramesX: 1.0,               // Number of frames horizontally
+    uFramesY: 1.0,               // Number of frames vertically
+    uTotalFrames: 1.0,           // Total number of frames
+    uFrameRate: 24.0,            // Animation frame rate
+    uAnimationMode: 0.0,         // 0=once, 1=loop, 2=ping-pong
+    uRandomStartFrame: 0.0,      // Random start frame timing
     
-    // === NEW TORNADO UNIFORMS ===
+    // === TORNADO UNIFORMS ===
     uTornadoEnabled: 0.0,
     uTornadoHeight: 8.0,
     uVerticalSpeed: 1.0,
@@ -93,9 +101,14 @@ const VfxEngine = ({
   particleTexture = 'Circle',
   motionBlur = false,
   
-  // === REMOVED: Sprite props (no longer needed) ===
+  // === NEW SPRITESHEET PROPS ===
+  useSpritesheet = false,
+  spritesheetName = 'fire_explosion_4x4',
+  spritesheetFrameRate = 24,
+  spritesheetAnimationMode = 'once',
+  spritesheetRandomStart = false,
   
-  // === NEW TORNADO PROPS ===
+  // === TORNADO PROPS ===
   tornadoEnabled = false,
   tornadoHeight = 8.0,
   verticalSpeed = 1.0,
@@ -126,15 +139,16 @@ const VfxEngine = ({
   // Hooks
   const { size: canvasSize } = useThree();
   const { textures } = useVfxTextures();
+  const { spritesheets, getSpritesheetByName } = useVfxSpritesheets();
 
-  // ✅ CORRECTED: Include tornado values in effectiveValues (removed sprite values)
+  // ✅ ENHANCED: Include spritesheet values in effectiveValues
   const effectiveValues = useMemo(() => {
     // If allVfxValues provided, use it directly
     if (allVfxValues) {
       return allVfxValues;
     }
     
-    // Otherwise use individual props INCLUDING tornado props (removed sprite props)
+    // Otherwise use individual props INCLUDING spritesheet props
     return { 
       positionX, positionY, positionZ, rotationX, rotationY, rotationZ, scale, opacity, 
       color, colorEnd, useGradient, blendMode, pCount, duration, 
@@ -142,6 +156,9 @@ const VfxEngine = ({
       directionalForceY, directionalForceZ, turbulence, streakLength, shape, 
       shapeHeight, shapeAngle, heightMultiplier, sizeVariation, timeVariation, 
       animationPreset, particleTexture, motionBlur,
+      // === SPRITESHEET VALUES ===
+      useSpritesheet, spritesheetName, spritesheetFrameRate, 
+      spritesheetAnimationMode, spritesheetRandomStart,
       // === TORNADO VALUES ===
       tornadoEnabled, tornadoHeight, verticalSpeed, rotationSpeed, vortexStrength,
       spiralSpin, baseDiameter, topDiameter, heightColorGradient
@@ -152,6 +169,9 @@ const VfxEngine = ({
       directionalForceX, directionalForceY, directionalForceZ, turbulence, 
       streakLength, shape, shapeHeight, shapeAngle, heightMultiplier, 
       sizeVariation, timeVariation, animationPreset, particleTexture, motionBlur,
+      // === SPRITESHEET DEPENDENCIES ===
+      useSpritesheet, spritesheetName, spritesheetFrameRate, 
+      spritesheetAnimationMode, spritesheetRandomStart,
       // === TORNADO DEPENDENCIES ===
       tornadoEnabled, tornadoHeight, verticalSpeed, rotationSpeed, vortexStrength,
       spiralSpin, baseDiameter, topDiameter, heightColorGradient]);
@@ -163,19 +183,19 @@ const VfxEngine = ({
       const positions = new Float32Array([0, 0, 0, 1, 0, 0, -1, 0, 0]);
       const sizes = new Float32Array([1, 1, 1]);
       const timeMultipliers = new Float32Array([1, 1, 1]);
-      const heightFactors = new Float32Array([0.5, 0.5, 0.5]); // NEW
+      const heightFactors = new Float32Array([0.5, 0.5, 0.5]);
     
       geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
       geo.setAttribute('aSize', new THREE.Float32BufferAttribute(sizes, 1));
       geo.setAttribute('aTimeMultiplier', new THREE.Float32BufferAttribute(timeMultipliers, 1));
-      geo.setAttribute('aHeightFactor', new THREE.Float32BufferAttribute(heightFactors, 1)); // NEW
+      geo.setAttribute('aHeightFactor', new THREE.Float32BufferAttribute(heightFactors, 1));
       geo.computeBoundingSphere();
     
       return geo;
     };
   }, []);
 
-  // Geometry state generated asynchronously (supports GLB and avoids Promise issues)
+  // Geometry state generated asynchronously
   const [geometry, setGeometry] = useState(() => createFallbackGeometry());
 
   // ✅ CORRECTED: Geometry generation with tornado support
@@ -183,18 +203,17 @@ const VfxEngine = ({
     let cancelled = false;
     (async () => {
       try {
-        // ✅ CORRECTED: Pass tornado options to generatePositions
         const tornadoOptions = effectiveValues.tornadoEnabled ? {
           tornadoHeight: effectiveValues.tornadoHeight,
-          spiralBranches: 3, // Could be made configurable later
+          spiralBranches: 3,
           spiralSpin: effectiveValues.spiralSpin,
-          spiralRadius: 2.0, // Could be made configurable later
+          spiralRadius: 2.0,
           baseDiameter: effectiveValues.baseDiameter,
           topDiameter: effectiveValues.topDiameter,
-          spiralRandomness: 0.2, // Could be made configurable later
-          spiralRandomnessPower: 3, // Could be made configurable later
-          layerCount: 1, // Could be made configurable later
-          layerOffset: 0.5, // Could be made configurable later
+          spiralRandomness: 0.2,
+          spiralRandomnessPower: 3,
+          layerCount: 1,
+          layerOffset: 0.5,
           vortexStrength: effectiveValues.vortexStrength
         } : {};
 
@@ -205,7 +224,7 @@ const VfxEngine = ({
           effectiveValues.shapeHeight || 2.0,
           effectiveValues.shapeAngle || 0,
           effectiveValues.heightMultiplier || 1.0,
-          tornadoOptions // ✅ CORRECTED: Pass tornado options
+          tornadoOptions
         );
 
         if (!positions || !positions.length) {
@@ -213,23 +232,19 @@ const VfxEngine = ({
           return;
         }
 
-        // ✅ CORRECTED: Generate attributes including aHeightFactor
         const sizes = new Float32Array(effectiveValues.pCount);
         const timeMultipliers = new Float32Array(effectiveValues.pCount);
-        const heightFactors = new Float32Array(effectiveValues.pCount); // NEW
+        const heightFactors = new Float32Array(effectiveValues.pCount);
         
         for (let i = 0; i < effectiveValues.pCount; i++) {
           sizes[i] = Math.random() * (effectiveValues.sizeVariation || 0.5) + (1 - (effectiveValues.sizeVariation || 0.5) / 2);
           timeMultipliers[i] = 1 + Math.random() * (effectiveValues.timeVariation || 0.4);
           
-          // ✅ CORRECTED: Calculate height factor for tornado effects
           if (effectiveValues.tornadoEnabled && effectiveValues.shape === 'tornado') {
-            // For tornado shapes, calculate height factor based on Y position
-            const y = positions[i * 3 + 1]; // Y position
+            const y = positions[i * 3 + 1];
             const tornadoHeight = effectiveValues.tornadoHeight || 8.0;
             heightFactors[i] = Math.max(0, Math.min(1, y / tornadoHeight));
           } else {
-            // For non-tornado shapes, use neutral height factor
             heightFactors[i] = 0.5;
           }
         }
@@ -238,7 +253,7 @@ const VfxEngine = ({
         geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
         geo.setAttribute('aSize', new THREE.Float32BufferAttribute(sizes, 1));
         geo.setAttribute('aTimeMultiplier', new THREE.Float32BufferAttribute(timeMultipliers, 1));
-        geo.setAttribute('aHeightFactor', new THREE.Float32BufferAttribute(heightFactors, 1)); // NEW
+        geo.setAttribute('aHeightFactor', new THREE.Float32BufferAttribute(heightFactors, 1));
         geo.computeBoundingSphere();
 
         if (!cancelled) setGeometry(geo);
@@ -250,52 +265,45 @@ const VfxEngine = ({
 
     return () => { cancelled = true; };
   }, [
-    effectiveValues.shape,
-    effectiveValues.pCount,
-    effectiveValues.spread,
-    effectiveValues.shapeHeight,
-    effectiveValues.shapeAngle,
-    effectiveValues.heightMultiplier,
-    effectiveValues.sizeVariation,
-    effectiveValues.timeVariation,
-    // ✅ CORRECTED: Add tornado dependencies
-    effectiveValues.tornadoEnabled,
-    effectiveValues.tornadoHeight,
-    effectiveValues.spiralSpin,
-    effectiveValues.baseDiameter,
-    effectiveValues.topDiameter,
-    effectiveValues.vortexStrength,
+    effectiveValues.shape, effectiveValues.pCount, effectiveValues.spread,
+    effectiveValues.shapeHeight, effectiveValues.shapeAngle, effectiveValues.heightMultiplier,
+    effectiveValues.sizeVariation, effectiveValues.timeVariation,
+    effectiveValues.tornadoEnabled, effectiveValues.tornadoHeight, effectiveValues.spiralSpin,
+    effectiveValues.baseDiameter, effectiveValues.topDiameter, effectiveValues.vortexStrength,
     createFallbackGeometry
   ]);
 
-  // Handle animation triggers only (not real-time updates)
+  // Handle animation triggers
   useEffect(() => {
     if (effectiveValues.trigger) {
-      console.log('🚀 VfxEngine: Animation trigger fired', effectiveValues.tornadoEnabled ? '(Tornado mode)' : '');
+      console.log('🚀 VfxEngine: Animation trigger fired', 
+        effectiveValues.useSpritesheet ? '(Spritesheet mode)' : 
+        effectiveValues.tornadoEnabled ? '(Tornado mode)' : ''
+      );
       setIsPlaying(true);
       startTimeRef.current = performance.now() / 1000;
     }
-  }, [effectiveValues.trigger, effectiveValues.tornadoEnabled]);
+  }, [effectiveValues.trigger, effectiveValues.useSpritesheet, effectiveValues.tornadoEnabled]);
 
-  // ✅ UPDATED: Material uniforms with auto-detect texture logic
+  // ✅ ENHANCED: Material uniforms with spritesheet support
   useEffect(() => {
     if (!materialRef.current) return;
 
     const material = materialRef.current;
     
-    // Basic uniforms - update in real-time
+    // Basic uniforms
     material.uniforms.uSize.value = effectiveValues.pSize || 0.4;
     material.uniforms.uResolution.value.set(
       canvasSize.width * Math.min(window.devicePixelRatio, 2),
       canvasSize.height * Math.min(window.devicePixelRatio, 2)
     );
     
-    // Colors - update in real-time
+    // Colors
     material.uniforms.uColor.value = new THREE.Color(effectiveValues.color || '#ff6030');
     material.uniforms.uColorEnd.value = new THREE.Color(effectiveValues.colorEnd || '#ff0030');
     material.uniforms.uUseGradient.value = effectiveValues.useGradient ? 1.0 : 0.0;
     
-    // Physics - update in real-time
+    // Physics
     material.uniforms.uGravity.value = effectiveValues.gravity || 0;
     material.uniforms.uTurbulence.value = effectiveValues.turbulence || 0;
     material.uniforms.uStreakLength.value = effectiveValues.streakLength || 0;
@@ -307,7 +315,7 @@ const VfxEngine = ({
     material.uniforms.uMotionBlur.value = effectiveValues.motionBlur ? 1.0 : 0.0;
     material.uniforms.uOpacity.value = effectiveValues.opacity || 1.0;
     
-    // ✅ CORRECTED: NEW TORNADO UNIFORM UPDATES
+    // Tornado uniforms
     material.uniforms.uTornadoEnabled.value = effectiveValues.tornadoEnabled ? 1.0 : 0.0;
     material.uniforms.uTornadoHeight.value = effectiveValues.tornadoHeight || 8.0;
     material.uniforms.uVerticalSpeed.value = effectiveValues.verticalSpeed || 1.0;
@@ -318,45 +326,76 @@ const VfxEngine = ({
     material.uniforms.uTopDiameter.value = effectiveValues.topDiameter || 3.0;
     material.uniforms.uHeightColorGradient.value = effectiveValues.heightColorGradient ? 1.0 : 0.0;
     
-    // ✅ NEW: Auto-detect texture type and apply accordingly
-    const selectedTextureName = effectiveValues.particleTexture || 'Circle';
+    // ✅ NEW: Spritesheet uniforms
+    material.uniforms.uUseSpritesheet.value = effectiveValues.useSpritesheet ? 1.0 : 0.0;
+    material.uniforms.uRandomStartFrame.value = effectiveValues.spritesheetRandomStart ? 1.0 : 0.0;
+    material.uniforms.uFrameRate.value = effectiveValues.spritesheetFrameRate || 24;
     
-    // First, try to find in extended textures (sprites)
-    if (sprites && sprites.length > 0) {
-      const sprite = sprites.find(s => s.name === selectedTextureName);
-      if (sprite) {
-        material.uniforms.uTexture.value = sprite;
-        console.log('🖼️ Using extended texture:', sprite.name, '(Category:', sprite.category + ')');
-        material.needsUpdate = true;
-        return;
+    // Convert animation mode string to number
+    const animationModeMap = { 'once': 0, 'loop': 1, 'ping-pong': 2 };
+    material.uniforms.uAnimationMode.value = animationModeMap[effectiveValues.spritesheetAnimationMode] || 0;
+    
+    // ✅ ENHANCED: Texture selection with spritesheet support
+    if (effectiveValues.useSpritesheet && spritesheets.length > 0) {
+      // Use spritesheet
+      const spritesheet = getSpritesheetByName(effectiveValues.spritesheetName);
+      if (spritesheet) {
+        material.uniforms.uTexture.value = spritesheet;
+        material.uniforms.uFramesX.value = spritesheet.framesX;
+        material.uniforms.uFramesY.value = spritesheet.framesY;
+        material.uniforms.uTotalFrames.value = spritesheet.totalFrames;
+        
+        console.log('🎬 Using spritesheet:', spritesheet.name, {
+          frames: `${spritesheet.framesX}x${spritesheet.framesY}`,
+          total: spritesheet.totalFrames,
+          mode: effectiveValues.spritesheetAnimationMode
+        });
       }
-    }
-    
-    // If not found in sprites, look in basic particle textures
-    if (textures.length > 0) {
-      const texture = textures.find(t => t.name === selectedTextureName);
-      if (texture) {
-        material.uniforms.uTexture.value = texture;
-        console.log('🔹 Using basic particle texture:', texture.name);
-      } else {
-        // Fallback to first available texture
-        material.uniforms.uTexture.value = textures[0];
-        console.log('⚠️ Texture not found, using fallback:', textures[0].name);
+    } else {
+      // Use static texture (existing logic)
+      const selectedTextureName = effectiveValues.particleTexture || 'Circle';
+      
+      // Reset spritesheet uniforms when not using spritesheets
+      material.uniforms.uFramesX.value = 1.0;
+      material.uniforms.uFramesY.value = 1.0;
+      material.uniforms.uTotalFrames.value = 1.0;
+      
+      // Try extended textures first
+      if (sprites && sprites.length > 0) {
+        const sprite = sprites.find(s => s.name === selectedTextureName);
+        if (sprite) {
+          material.uniforms.uTexture.value = sprite;
+          console.log('🖼️ Using extended texture:', sprite.name);
+          material.needsUpdate = true;
+          return;
+        }
+      }
+      
+      // Fall back to basic particle textures
+      if (textures.length > 0) {
+        const texture = textures.find(t => t.name === selectedTextureName);
+        if (texture) {
+          material.uniforms.uTexture.value = texture;
+          console.log('🔹 Using basic texture:', texture.name);
+        } else {
+          material.uniforms.uTexture.value = textures[0];
+          console.log('⚠️ Texture not found, using fallback:', textures[0].name);
+        }
       }
     }
 
     material.needsUpdate = true;
     
-    // Debug tornado mode changes
-    if (effectiveValues.tornadoEnabled) {
-      console.log('🌪️ Tornado uniforms updated:', {
-        enabled: effectiveValues.tornadoEnabled,
-        height: effectiveValues.tornadoHeight,
-        rotationSpeed: effectiveValues.rotationSpeed,
-        vortexStrength: effectiveValues.vortexStrength
+    // Debug spritesheet mode changes
+    if (effectiveValues.useSpritesheet) {
+      console.log('🎬 Spritesheet uniforms updated:', {
+        enabled: effectiveValues.useSpritesheet,
+        name: effectiveValues.spritesheetName,
+        frameRate: effectiveValues.spritesheetFrameRate,
+        mode: effectiveValues.spritesheetAnimationMode
       });
     }
-  }, [effectiveValues, canvasSize, textures, sprites]);
+  }, [effectiveValues, canvasSize, textures, sprites, spritesheets, getSpritesheetByName]);
 
   // Animation loop
   useFrame((state) => {
@@ -378,7 +417,9 @@ const VfxEngine = ({
       }
     } else {
       // Design mode - show particles
-      materialRef.current.uniforms.uProgress.value = effectiveValues.tornadoEnabled ? 0.5 : 0.3;
+      const designProgress = effectiveValues.useSpritesheet ? 0.5 : 
+                           effectiveValues.tornadoEnabled ? 0.5 : 0.3;
+      materialRef.current.uniforms.uProgress.value = designProgress;
       materialRef.current.uniforms.uTime.value = elapsedTime;
     }
   });

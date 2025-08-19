@@ -8,6 +8,7 @@ import fileManager from '../timeline/fileManager';
 import { getVfxValues } from './VfxParameters.js';
 import { useVfxSettings } from '../../contexts/VfxSettingsContext.jsx';
 import { useVfxSprites } from '../../hooks/index.js';
+import { useVfxSpritesheets } from '../../hooks/useVfxSpritesheets.js';
 
 // Debug flag for real-time updates
 const DEBUG = false;
@@ -19,10 +20,11 @@ const VfxLevaControls = () => {
   // ✅ SHARED: Use shared VFX settings context
   const { vfxSettings, updateVfxSettings } = useVfxSettings();
   
-  // Load all available sprite textures
-  const { sprites, spriteOptions, spriteCategories } = useVfxSprites();
+  // Load all available textures and spritesheets
+  const { sprites, spriteCategories } = useVfxSprites();
+  const { spritesheets, spritesheetOptions, animationModeOptions, getSpritesheetMetadata } = useVfxSpritesheets();
 
-  // ✅ NEW: Combined texture options (basic + extended)
+  // ✅ ENHANCED: Combined texture options (basic + extended)
   const allTextureOptions = useMemo(() => {
     const options = {};
     
@@ -53,11 +55,11 @@ const VfxLevaControls = () => {
     return options;
   }, [sprites, spriteCategories]);
 
-  // ✅ FIXED: Create config object first, then use it in useControls
+  // ✅ ENHANCED: Create config object with new spritesheet section
   const levaConfig = useMemo(() => ({
     // === PARTICLES ===
     'Particles': folder({
-      pCount: { value: vfxValues.pCount, min: 50, max: 2000, step: 10 },
+      pCount: { value: vfxValues.pCount, min: 1, max: 4000, step: 10 },
       duration: { value: vfxValues.duration, min: 0.5, max: 10.0, step: 0.1 },
       pSize: { 
         value: vfxValues.pSize, 
@@ -96,24 +98,57 @@ const VfxLevaControls = () => {
 
     // === SHAPE & TEXTURE ===
     'Shape & Texture': folder({
-      shape: {
-        value: vfxValues.shape,
-        options: ['explosion', 'sphere', 'box', 'cone', 'circle', 'square', 'spiral', 'wave', 'glb', 'model', 'tornado']
+          shape: {
+            value: vfxValues.shape,
+            options: ['explosion', 'sphere', 'box', 'cone', 'circle', 'square', 'spiral', 'wave', 'glb', 'model', 'tornado']
+          },
+          shapeHeight: { value: vfxValues.shapeHeight, min: 0.5, max: 10.0, step: 0.1 },
+          shapeAngle: { value: vfxValues.shapeAngle, min: 0, max: 360, step: 1 },
+          heightMultiplier: { value: vfxValues.heightMultiplier, min: 0.1, max: 5.0, step: 0.1 },
+          animationPreset: {
+            value: vfxValues.animationPreset,
+            options: ['none', 'fadeIn', 'fadeOut', 'spiral', 'burst', 'gravity']
+          },
+          // ✅ UPDATED: Combined texture selection
+          particleTexture: {
+            value: vfxValues.particleTexture || 'Circle',
+            options: allTextureOptions,
+            label: 'Texture (Basic + Extended)'
+          },
+          motionBlur: { value: vfxValues.motionBlur }
+        }),
+
+    // === NEW: ANIMATED TEXTURES (SPRITESHEETS) ===
+    'Animated Textures': folder({
+      useSpritesheet: { 
+        value: getVfxValues().useSpritesheet || false,
+        label: '🎬 Use Animated Spritesheet'
       },
-      shapeHeight: { value: vfxValues.shapeHeight, min: 0.5, max: 10.0, step: 0.1 },
-      shapeAngle: { value: vfxValues.shapeAngle, min: 0, max: 360, step: 1 },
-      heightMultiplier: { value: vfxValues.heightMultiplier, min: 0.1, max: 5.0, step: 0.1 },
-      animationPreset: {
-        value: vfxValues.animationPreset,
-        options: ['none', 'fadeIn', 'fadeOut', 'spiral', 'burst', 'gravity']
+      spritesheetName: {
+        value: getVfxValues().spritesheetName || 'fire_explosion_4x4',
+        options: spritesheetOptions,
+        label: 'Spritesheet',
+        render: (get) => get('VFX Controls.Animated Textures.useSpritesheet'),
       },
-      // ✅ UPDATED: Combined texture selection
-      particleTexture: {
-        value: vfxValues.particleTexture || 'Circle',
-        options: allTextureOptions,
-        label: 'Texture (Basic + Extended)'
+      spritesheetFrameRate: {
+        value: getVfxValues().spritesheetFrameRate || 24,
+        min: 1,
+        max: 60,
+        step: 1,
+        label: 'Frame Rate (fps)',
+        render: (get) => get('VFX Controls.Animated Textures.useSpritesheet'),
       },
-      motionBlur: { value: vfxValues.motionBlur }
+      spritesheetAnimationMode: {
+        value: getVfxValues().spritesheetAnimationMode || 'once',
+        options: animationModeOptions,
+        label: 'Animation Mode',
+        render: (get) => get('VFX Controls.Animated Textures.useSpritesheet'),
+      },
+      spritesheetRandomStart: {
+        value: getVfxValues().spritesheetRandomStart || false,
+        label: 'Random Start Frames',
+        render: (get) => get('VFX Controls.Animated Textures.useSpritesheet'),
+      }
     }),
 
     // === TORNADO CONTROLS ===
@@ -162,12 +197,21 @@ const VfxLevaControls = () => {
         label: 'Height Color Gradient'
       }
     })
-    // ✅ REMOVED: Sprites section completely removed
-  }), [vfxValues, allTextureOptions]);
+  }), [vfxValues, allTextureOptions, spritesheetOptions, animationModeOptions]);
 
   const [allVfxControls, setAllVfxControls] = useControls('VFX Controls', () => levaConfig);
 
-  // ✅ FIXED: Local values for VfxEngine (includes default transforms)
+  // ✅ FORCE UPDATE: When spritesheetOptions becomes populated, force Leva to refresh
+  useEffect(() => {
+    const hasSpritesheetOptions = Object.keys(spritesheetOptions).length > 0;
+    if (hasSpritesheetOptions) {
+      console.log('🔄 Spritesheet options populated, forcing Leva update');
+      // Force regeneration by updating the config
+      setAllVfxControls({}); // This triggers Leva to rebuild with new options
+    }
+  }, [spritesheetOptions, setAllVfxControls]);
+
+  // ✅ ENHANCED: Local values for VfxEngine (includes spritesheet data)
   const allVfxValues = useMemo(() => ({
     // Default transform values (for VFX-only mode)
     positionX: vfxValues.positionX,
@@ -181,10 +225,13 @@ const VfxLevaControls = () => {
     ...allVfxControls
   }), [allVfxControls, vfxValues]);
 
-  // ✅ REAL-TIME: VFX trigger for animation playback
+  // ✅ ENHANCED: VFX trigger for animation playback with mode detection
   const actionControls = useControls("🚀 Actions", {
     'Fire Current Settings!': button(() => {
-      console.log('🚀 Firing VFX animation');
+      const mode = allVfxControls.useSpritesheet ? 'Spritesheet' : 
+                   allVfxControls.tornadoEnabled ? 'Tornado' : 'Standard';
+      console.log(`🚀 Firing VFX animation (${mode} mode)`);
+      
       // Trigger animation playback with current settings
       setVfxValues({ ...allVfxValues, trigger: true });
       // Auto-reset trigger after brief moment
@@ -196,10 +243,32 @@ const VfxLevaControls = () => {
       console.log('🔍 Current VFX Values:', allVfxValues);
       console.log('🔍 Live VFX Controls:', allVfxControls);
       console.log('🔍 Parameters count:', Object.keys(allVfxValues).length);
+      
+      // Show spritesheet info if enabled
+      if (allVfxControls.useSpritesheet) {
+        const metadata = getSpritesheetMetadata(allVfxControls.spritesheetName);
+        console.log('🎬 Spritesheet metadata:', metadata);
+      }
+    }),
+    'Show Spritesheet Info': button(() => {
+      if (allVfxControls.useSpritesheet) {
+        const metadata = getSpritesheetMetadata(allVfxControls.spritesheetName);
+        if (metadata) {
+          alert(`🎬 Spritesheet: ${metadata.name}\n` +
+                `Grid: ${metadata.framesX}x${metadata.framesY}\n` +
+                `Total Frames: ${metadata.totalFrames}\n` +
+                `Frame Rate: ${metadata.frameRate}fps\n` +
+                `Mode: ${metadata.animationMode}\n` +
+                `Category: ${metadata.category}\n` +
+                `Description: ${metadata.description}`);
+        }
+      } else {
+        alert('🔍 Enable spritesheet mode to view spritesheet information');
+      }
     })
   });
 
-  // ✅ SIMPLE: File operations using context methods
+  // ✅ ENHANCED: File operations with spritesheet support
   useControls('💾 File Operations', {
     'Save Settings': button(() => {
       const vfxData = {
@@ -207,7 +276,7 @@ const VfxLevaControls = () => {
       };
       
       fileManager.saveJSON(vfxData, 'vfx-settings.json');
-      console.log('💾 VFX settings saved');
+      console.log('💾 VFX settings saved (including spritesheet settings)');
     }),
     'Load Settings': button(() => {
       if (fileInputRef.current) fileInputRef.current.click();
@@ -219,7 +288,7 @@ const VfxLevaControls = () => {
     updateVfxSettings(allVfxControls);
   }, [allVfxControls, updateVfxSettings]);
 
-  // Debug effect for real-time updates
+  // ✅ ENHANCED: Debug effect for real-time updates with spritesheet info
   useEffect(() => {
     if (DEBUG) {
       console.log('🔄 Real-time VFX update:', {
@@ -228,6 +297,8 @@ const VfxLevaControls = () => {
         gravity: allVfxControls.gravity,
         color: allVfxControls.color,
         shape: allVfxControls.shape,
+        useSpritesheet: allVfxControls.useSpritesheet,
+        spritesheetName: allVfxControls.spritesheetName,
         timestamp: Date.now()
       });
     }
@@ -235,8 +306,6 @@ const VfxLevaControls = () => {
 
   // ✅ REAL-TIME: Always use current control values for live updates
   const finalVfxValues = useMemo(() => {
-    // Always use current allVfxValues for real-time feedback
-    // Add trigger state if needed for animation playback
     const baseValues = { ...allVfxValues };
     if (Object.keys(vfxValues).length > 0 && vfxValues.trigger) {
       baseValues.trigger = true;
@@ -244,7 +313,7 @@ const VfxLevaControls = () => {
     return baseValues;
   }, [allVfxValues, vfxValues]);
 
-  // ✅ EXACT TIMELINE PATTERN: File import copying timeline logic exactly
+  // ✅ ENHANCED: File import with spritesheet support
   const handleImport = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -252,29 +321,32 @@ const VfxLevaControls = () => {
     fileManager.loadJSON(file, (data) => {
       console.log('📂 Raw loaded data:', data);
       console.log('📂 Data keys:', Object.keys(data || {}));
-      // ✅ EXACT COPY: Check if it's the new structured format (like timeline)
+      
       if (data.vfxSettings) {
         console.log('⚙️ Loading structured VFX settings file');
         
-        // ✅ EXACT COPY: Update VFX settings directly like timeline
         if (updateVfxSettings) {
           updateVfxSettings(data.vfxSettings);
           console.log('✅ VFX settings restored');
         }
         
-          // Update local controls to reflect loaded values
-          console.log('🔍 About to call setAllVfxControls with:', data.vfxSettings);
-          
-          // ✅ FILTER: Remove transform values that don't belong in Leva controls
-          const { positionX, positionY, positionZ, rotationX, rotationY, rotationZ, scale, ...vfxOnlySettings } = data.vfxSettings;
-          console.log('🔍 Filtered VFX settings (no transforms):', vfxOnlySettings);
-          
-          setAllVfxControls(vfxOnlySettings);
-          console.log('✅ Local controls updated');
-          
-          console.log('🎬 VFX settings loaded successfully');
+        // Update local controls to reflect loaded values
+        console.log('🔍 About to call setAllVfxControls with:', data.vfxSettings);
+        
+        // ✅ FILTER: Remove transform values that don't belong in Leva controls
+        const { positionX, positionY, positionZ, rotationX, rotationY, rotationZ, scale, ...vfxOnlySettings } = data.vfxSettings;
+        console.log('🔍 Filtered VFX settings (no transforms):', vfxOnlySettings);
+        
+        // Check if spritesheet settings are present
+        if (vfxOnlySettings.useSpritesheet) {
+          console.log('🎬 Spritesheet settings detected in loaded file');
+        }
+        
+        setAllVfxControls(vfxOnlySettings);
+        console.log('✅ Local controls updated');
+        
+        console.log('🎬 VFX settings loaded successfully');
       } 
-      // ✅ EXACT COPY: Legacy format - direct VFX data (like timeline rows check)
       else if (data.pCount || data.color) {
         console.log('🔍 Loading legacy VFX settings file');
         
@@ -287,7 +359,6 @@ const VfxLevaControls = () => {
         const { positionX, positionY, positionZ, rotationX, rotationY, rotationZ, scale, ...legacyVfxSettings } = data;
         setAllVfxControls(legacyVfxSettings);
       }
-      // ✅ EXACT COPY: Unknown format (like timeline)
       else {
         console.warn('⚠️ Unknown VFX file format');
         alert('Invalid VFX settings file format');
@@ -389,7 +460,7 @@ const VfxLevaControls = () => {
             fadeStrength={1}
           />
 
-          {/* ✅ VfxEngine with clean values */}
+          {/* ✅ ENHANCED: VfxEngine with spritesheet support */}
           <VfxEngine 
             allVfxValues={finalVfxValues}
             sprites={sprites}

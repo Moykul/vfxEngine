@@ -1,0 +1,123 @@
+{
+  "fire_explosion_4x4": {
+    "name": "Fire Explosion",
+    "texture": "fire_explosion_4x4.png",
+    "framesX": 4,
+    "framesY": 4,
+    "totalFrames": 16,
+    "frameRate": 24,
+    "category": "fire",
+    "animationMode": "once",
+    "description": "Large fire explosion sequence"
+  },
+  "smoke_puff_4x2": {
+    "name": "Smoke Puff",
+    "texture": "smoke_puff_4x2.png",
+    "framesX": 4,
+    "framesY": 2,
+    "totalFrames": 8,
+    "frameRate": 12,
+    "category": "smoke",
+    "animationMode": "once",
+    "description": "Small smoke puff dissipation"
+  },
+  "magic_sparkle_8x1": {
+    "name": "Magic Sparkle",
+    "texture": "magic_sparkle_8x1.png",
+    "framesX": 8,
+    "framesY": 1,
+    "totalFrames": 8,
+    "frameRate": 16,
+    "category": "magic",
+    "animationMode": "loop",
+    "description": "Magical sparkle loop"
+  },
+  "flame_flicker_2x4": {
+    "name": "Flame Flicker",
+    "texture": "flame_flicker_2x4.png",
+    "framesX": 2,
+    "framesY": 4,
+    "totalFrames": 8,
+    "frameRate": 8,
+    "category": "flame",
+    "animationMode": "loop",
+    "description": "Continuous flame flicker"
+  },
+  "electric_spark_4x4": {
+    "name": "Electric Spark",
+    "texture": "electric_spark_4x4.png",
+    "framesX": 4,
+    "framesY": 4,
+    "totalFrames": 16,
+    "frameRate": 30,
+    "category": "electric",
+    "animationMode": "once",
+    "description": "Electric discharge effect"
+  },
+  "water_splash_6x2": {
+    "name": "Water Splash",
+    "texture": "water_splash_6x2.png",
+    "framesX": 6,
+    "framesY": 2,
+    "totalFrames": 12,
+    "frameRate": 18,
+    "category": "water",
+    "animationMode": "once",
+    "description": "Water impact splash"
+  },
+  "dust_cloud_3x3": {
+    "name": "Dust Cloud",
+    "texture": "dust_cloud_3x3.png",
+    "framesX": 3,
+    "framesY": 3,
+    "totalFrames": 9,
+    "frameRate": 10,
+    "category": "dust",
+    "animationMode": "once",
+    "description": "Expanding dust cloud"
+  },
+  "energy_burst_4x3": {
+    "name": "Energy Burst",
+    "texture": "energy_burst_4x3.png",
+    "framesX": 4,
+    "framesY": 3,
+    "totalFrames": 12,
+    "frameRate": 20,
+    "category": "energy",
+    "animationMode": "once",
+    "description": "Radiating energy burst"
+  },
+  "steam_wisp_2x2": {
+    "name": "Steam Wisp",
+    "texture": "steam_wisp_2x2.png",
+    "framesX": 2,
+    "framesY": 2,
+    "totalFrames": 4,
+    "frameRate": 6,
+    "category": "steam",
+    "animationMode": "loop",
+    "description": "Gentle steam animation"
+  },
+  "explosion_shockwave_8x2": {
+    "name": "Explosion Shockwave",
+    "texture": "explosion_shockwave_8x2.png",
+    "framesX": 8,
+    "framesY": 2,
+    "totalFrames": 16,
+    "frameRate": 24,
+    "category": "explosion",
+    "animationMode": "once",
+    "description": "Expanding shockwave ring"
+  },
+  "pow_explosion_5x5": {
+    "name": "POW Explosion", 
+    "texture": "POW.png",
+    "framesX": 5,
+    "framesY": 5,
+    "totalFrames": 25,
+    "frameRate": 24,
+    "category": "comic",
+    "animationMode": "once",
+    "description": "Comic book style POW explosion effect"
+  }
+}

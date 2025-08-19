@@ -1,64 +1,62 @@
-export const ANIMATABLE_VFX_PARAMS = {
-  // Transform (7 params)
-  positionX: {
-    value: 0, min: -10, max: 10, step: 0.1,
-    timelineName: 'positionX',
-    displayName: 'Position X'
-  },
-  positionY: {
-    value: 0, min: -10, max: 10, step: 0.1,
-    timelineName: 'positionY',
-    displayName: 'Position Y'
-  },
-  positionZ: {
-    value: 0, min: -10, max: 10, step: 0.1,
-    timelineName: 'positionZ',
-    displayName: 'Position Z'
-  },
-  rotationX: {
-    value: 0, min: 0, max: 360, step: 1,
-    timelineName: 'rotationX',
-    displayName: 'Rotation X'
-  },
-  rotationY: {
-    value: 0, min: 0, max: 360, step: 1,
-    timelineName: 'rotationY',
-    displayName: 'Rotation Y'
-  },
-  rotationZ: {
-    value: 0, min: 0, max: 360, step: 1,
-    timelineName: 'rotationZ',
-    displayName: 'Rotation Z'
-  },
-  scale: {
-    value: 1, min: 0.1, max: 5, step: 0.1,
-    timelineName: 'scale',
-    displayName: 'Scale'
-  },
+// VFX Parameters - Enhanced with Spritesheet Support
+// Default values for VFX system including new spritesheet properties
 
-  // Visual (1 param)
-  opacity: {
-    value: 1.0, min: 0.0, max: 1.0, step: 0.1,
-    timelineName: 'opacity',
-    displayName: 'Opacity'
-  }
-};
+import * as THREE from 'three';
 
-// Fixed effect settings (not animatable)
-export const FIXED_VFX_SETTINGS = {
+// ✅ ENHANCED: Updated default VFX values with spritesheet support
+export const getVfxValues = () => ({
+  // Transform properties
+  positionX: 0,
+  positionY: 0,
+  positionZ: 0,
+  rotationX: 0,
+  rotationY: 0,
+  rotationZ: 0,
+  scale: 1,
+  
+  // Core particle properties
   pCount: 800,
   duration: 3.0,
-  pSize: 0.1,
+  pSize: 0.4,
   spread: 2,
-  color: '#30ffcf',
-  colorEnd: '#f520bc',
-  shape: 'explosion',
+  pAge: 1.0,
+  sizeVariation: 0.5,
+  timeVariation: 0.4,
+  
+  // Visual properties
+  color: '#ff6030',
+  colorEnd: '#ff0030',
+  useGradient: false,
+  opacity: 1.0,
+  blendMode: 0, // 0=Additive, 1=Normal, 2=Multiply, 3=Subtractive
+  
+  // Physics properties
   gravity: 0,
   turbulence: 0,
-  particleTexture: 'Circle',
-  blendMode: 0,
+  directionalForceX: 0,
+  directionalForceY: 0,
+  directionalForceZ: 0,
+  streakLength: 0,
   
-  // === TORNADO SETTINGS ===
+  // Shape and pattern
+  shape: 'explosion',
+  shapeHeight: 2.0,
+  shapeAngle: 0,
+  heightMultiplier: 1.0,
+  
+  // Animation and effects
+  animationPreset: 'none',
+  particleTexture: 'Circle',
+  motionBlur: false,
+  
+  // ✅ NEW: Spritesheet properties
+  useSpritesheet: false,
+  spritesheetName: 'fire_explosion_4x4',
+  spritesheetFrameRate: 24,
+  spritesheetAnimationMode: 'once', // 'once', 'loop', 'ping-pong'
+  spritesheetRandomStart: false,
+  
+  // Tornado properties
   tornadoEnabled: false,
   tornadoHeight: 8.0,
   verticalSpeed: 1.0,
@@ -67,175 +65,152 @@ export const FIXED_VFX_SETTINGS = {
   spiralSpin: 2.0,
   baseDiameter: 0.5,
   topDiameter: 3.0,
-  heightColorGradient: false
-};
+  heightColorGradient: false,
+  
+  // Control flags
+  trigger: false,
+  showHelpers: false,
+  helperOpacity: 0.3,
+  fileName: 'my-vfx-settings'
+});
 
-// Helper functions (removed complex logic)
-export const getAnimatableParams = () => Object.keys(ANIMATABLE_VFX_PARAMS);
+// ✅ NEW: Spritesheet-specific utility functions
+export const getSpritesheetDefaults = () => ({
+  useSpritesheet: false,
+  spritesheetName: 'fire_explosion_4x4',
+  spritesheetFrameRate: 24,
+  spritesheetAnimationMode: 'once',
+  spritesheetRandomStart: false
+});
 
-export const getTimelineModel = () => {
-  const rows = Object.entries(ANIMATABLE_VFX_PARAMS).map(([key, def]) => ({
-    name: def.timelineName,
-    displayName: def.displayName,
-    keyframes: [],
-    style: {
-      fillStyle: '#4f46e5',
-      strokeColor: '#3730a3',
-      height: 21
-    }
-  }));
-
-  return { rows };
-};
-
-export const createNormalizeFunctions = () => {
-  const normalize = {};
-  const denormalize = {};
-
-  Object.entries(ANIMATABLE_VFX_PARAMS).forEach(([levaKey, def]) => {
-    // Validate parameter definition
-    if (!def || typeof def.min !== 'number' || typeof def.max !== 'number' || !def.timelineName) {
-      console.warn('Invalid parameter definition for ' + levaKey + ':', def);
-      return;
-    }
-
-    const timelineName = def.timelineName;
-    const min = def.min;
-    const max = def.max;
-    const range = (max - min) === 0 ? 1 : (max - min); // avoid zero division
-
-    // Clamp-then-normalize (assumes min < max in our parameter set)
-    normalize[timelineName] = (value) => {
-      const v = Math.max(min, Math.min(max, value));
-      return (v - min) / range;
-    };
-
-    // Clamp normalized to [0,1] then denormalize
-    denormalize[timelineName] = (t) => {
-      const u = Math.max(0, Math.min(1, t));
-      return min + u * range;
-    };
-  });
-
-  return { normalize, denormalize };
-};
-
-export const validateVfxParameters = () => {
-  const errors = [];
-  const warnings = [];
-
-  Object.entries(ANIMATABLE_VFX_PARAMS).forEach(([key, def]) => {
-    if (!def) {
-      errors.push('Parameter ' + key + ' is undefined');
-      return;
-    }
-
-    if (typeof def.min !== 'number') {
-      errors.push('Parameter ' + key + ' has invalid min value: ' + def.min);
-    }
-
-    if (typeof def.max !== 'number') {
-      errors.push('Parameter ' + key + ' has invalid max value: ' + def.max);
-    }
-
-    if (!def.timelineName || typeof def.timelineName !== 'string') {
-      errors.push('Parameter ' + key + ' has invalid timelineName: ' + def.timelineName);
-    }
-
-    if (def.min === def.max) {
-      warnings.push('Parameter ' + key + ' has min === max (' + def.min + ')');
-    }
-
-    if (def.min > def.max) {
-      warnings.push('Parameter ' + key + ' has min > max (' + def.min + ' > ' + def.max + ')');
-    }
-  });
-
-  if (errors.length > 0) {
-    console.error('VFX Parameter validation errors:', errors);
-  }
-
-  if (warnings.length > 0) {
-    console.warn('VFX Parameter validation warnings:', warnings);
-  }
-
-  return { errors, warnings, isValid: errors.length === 0 };
-};
-
-// Enhanced parameter mapping with validation
-export const createParameterMapping = () => {
-  const timelineToLeva = {};
-  const levaToTimeline = {};
-
-  Object.entries(ANIMATABLE_VFX_PARAMS).forEach(([levaKey, def]) => {
-    if (!def || !def.timelineName) {
-      console.warn('Skipping invalid parameter mapping for ' + levaKey);
-      return;
-    }
-
-    timelineToLeva[def.timelineName] = levaKey;
-    levaToTimeline[levaKey] = def.timelineName;
-  });
-
-  return { timelineToLeva, levaToTimeline };
-};
-
-// All default values in one place
-export const getVfxValues = () => {
-  return {
-    // Transform parameters (animatable)
-    positionX: 0,
-    positionY: 0,
-    positionZ: 0,
-    rotationX: 0,
-    rotationY: 0,
-    rotationZ: 0,
-    scale: 1,
-    opacity: 1.0,
-
-    // Color parameters
-    color: '#9eff30',
-    colorEnd: '#00eeff',
-    useGradient: false,
-    blendMode: 0,
-
-    // Basic properties
-    pCount: 800,
-    duration: 3.0,
-    pSize: 0.1,
-    spread: 2,
-    pAge: 1.0,
-
-    // Physics parameters
-    gravity: 0,
-    directionalForceX: 0,
-    directionalForceY: 0,
-    directionalForceZ: 0,
-    turbulence: 0,
-    streakLength: 0,
-
-    // Shape parameters
-    shape: 'cone',
-    shapeHeight: 2.0,
-    shapeAngle: 0,
-    heightMultiplier: 1.0,
-    sizeVariation: 0.5,
-    timeVariation: 0.4,
-
-    // Animation parameters
-    animationPreset: 'none',
-    particleTexture: 'Circle',
-    motionBlur: false,
-
-    // === TORNADO PARAMETERS ===
-    tornadoEnabled: false,
-    tornadoHeight: 8.0,
-    verticalSpeed: 1.0,
-    rotationSpeed: 1.0,
-    vortexStrength: 1.0,
-    spiralSpin: 2.0,
-    baseDiameter: 0.5,
-    topDiameter: 3.0,
-    heightColorGradient: false
+// ✅ NEW: Animation mode mappings for shaders
+export const getAnimationModeValue = (mode) => {
+  const modeMap = {
+    'once': 0,
+    'loop': 1,
+    'ping-pong': 2
   };
+  return modeMap[mode] || 0;
+};
+
+// ✅ NEW: Recommended spritesheet configurations for different effects
+export const getSpritesheetPresets = () => ({
+  explosion: {
+    spritesheetName: 'fire_explosion_4x4',
+    spritesheetFrameRate: 24,
+    spritesheetAnimationMode: 'once',
+    spritesheetRandomStart: false
+  },
+  fire: {
+    spritesheetName: 'flame_flicker_2x4',
+    spritesheetFrameRate: 8,
+    spritesheetAnimationMode: 'loop',
+    spritesheetRandomStart: true
+  },
+  smoke: {
+    spritesheetName: 'smoke_puff_4x2',
+    spritesheetFrameRate: 12,
+    spritesheetAnimationMode: 'once',
+    spritesheetRandomStart: true
+  },
+  magic: {
+    spritesheetName: 'magic_sparkle_8x1',
+    spritesheetFrameRate: 16,
+    spritesheetAnimationMode: 'loop',
+    spritesheetRandomStart: false
+  },
+  electric: {
+    spritesheetName: 'electric_spark_4x4',
+    spritesheetFrameRate: 30,
+    spritesheetAnimationMode: 'once',
+    spritesheetRandomStart: true
+  },
+  water: {
+    spritesheetName: 'water_splash_6x2',
+    spritesheetFrameRate: 18,
+    spritesheetAnimationMode: 'once',
+    spritesheetRandomStart: false
+  }
+});
+
+// ✅ ENHANCED: Blend mode utilities
+export const getBlendModeValue = (blendMode) => {
+  switch (blendMode) {
+    case 1: return THREE.NormalBlending;
+    case 2: return THREE.MultiplyBlending;
+    case 3: return THREE.SubtractiveBlending;
+    default: return THREE.AdditiveBlending;
+  }
+};
+
+export const getBlendModeOptions = () => ({
+  'Additive': 0,
+  'Normal': 1,
+  'Multiply': 2,
+  'Subtractive': 3
+});
+
+// ✅ NEW: Validation functions for spritesheet parameters
+export const validateSpritesheetSettings = (settings) => {
+  const errors = [];
+  
+  if (settings.useSpritesheet) {
+    if (!settings.spritesheetName || settings.spritesheetName.trim() === '') {
+      errors.push('Spritesheet name is required when using spritesheets');
+    }
+    
+    if (settings.spritesheetFrameRate < 1 || settings.spritesheetFrameRate > 60) {
+      errors.push('Frame rate must be between 1 and 60 fps');
+    }
+    
+    const validModes = ['once', 'loop', 'ping-pong'];
+    if (!validModes.includes(settings.spritesheetAnimationMode)) {
+      errors.push('Animation mode must be one of: once, loop, ping-pong');
+    }
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+};
+
+// ✅ NEW: Performance recommendations based on spritesheet settings
+export const getPerformanceRecommendations = (settings) => {
+  const recommendations = [];
+  
+  if (settings.useSpritesheet) {
+    if (settings.spritesheetFrameRate > 30) {
+      recommendations.push('Consider reducing frame rate for better performance');
+    }
+    
+    if (settings.pCount > 1000 && settings.spritesheetFrameRate > 20) {
+      recommendations.push('High particle count + high frame rate may impact performance');
+    }
+    
+    if (settings.spritesheetRandomStart && settings.pCount > 500) {
+      recommendations.push('Random start frames with many particles may cause frame drops');
+    }
+  }
+  
+  return recommendations;
+};
+
+// ✅ NEW: Utility to merge spritesheet settings into VFX values
+export const mergeSpritesheetSettings = (baseSettings, spritesheetSettings) => {
+  return {
+    ...baseSettings,
+    useSpritesheet: true,
+    ...spritesheetSettings
+  };
+};
+
+// Export all utilities as a single object for convenience
+export const SpritesheetUtils = {
+  getDefaults: getSpritesheetDefaults,
+  getAnimationModeValue,
+  getPresets: getSpritesheetPresets,
+  validate: validateSpritesheetSettings,
+  getPerformanceRecommendations,
+  merge: mergeSpritesheetSettings
 };
