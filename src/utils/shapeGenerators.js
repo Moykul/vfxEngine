@@ -86,40 +86,170 @@ export const generateGLB = async (count, glbPath, radius = 1, heightMultiplier =
       throw new Error('GLB model has no position attributes');
     }
     
-    const vertices = geometry.attributes.position.array;
-    const vertexCount = vertices.length / 3;
-    
+    // Prefer sampling on triangle surfaces (area-weighted) for good coverage
+    const posAttr = geometry.attributes.position;
+    const posArray = posAttr.array;
+    const vertexCount = posAttr.count;
+
+    // Build index array for triangles
+    let indexArray = null;
+    if (geometry.index && geometry.index.array) {
+      indexArray = geometry.index.array;
+    } else {
+      // If non-indexed but positions form a triangle list (common when exported non-indexed)
+      // assume sequential triangles when vertexCount is divisible by 3
+      if (vertexCount % 3 === 0) {
+        indexArray = new Uint32Array(vertexCount);
+        for (let i = 0; i < vertexCount; i++) indexArray[i] = i;
+      }
+    }
+
+    // If we can't build triangle indices, fall back to vertex sampling
+    if (!indexArray) {
+      const positions = new Float32Array(count * 3);
+      for (let i = 0; i < count; i++) {
+        const i3 = i * 3;
+        const vi = Math.floor(Math.random() * vertexCount) * 3;
+        let x = posArray[vi] * radius;
+        let y = posArray[vi + 1] * radius * heightMultiplier;
+        let z = posArray[vi + 2] * radius;
+        if (randomOffset > 0) {
+          x += (Math.random() - 0.5) * randomOffset;
+          y += (Math.random() - 0.5) * randomOffset;
+          z += (Math.random() - 0.5) * randomOffset;
+        }
+        positions[i3] = x; positions[i3 + 1] = y; positions[i3 + 2] = z;
+      }
+      return positions;
+    }
+
+    // Build triangle list and area CDF (cache on geometry.userData._triSampler to reuse)
+    let triCount, triAreas, totalArea, cdf;
+    // always-have vector helpers to avoid undefined .set() when using cached sampler
+    let vA = new THREE.Vector3();
+    let vB = new THREE.Vector3();
+    let vC = new THREE.Vector3();
+    let edge1 = new THREE.Vector3();
+    let edge2 = new THREE.Vector3();
+
+    if (geometry.userData && geometry.userData._triSampler) {
+      const sampler = geometry.userData._triSampler;
+      triCount = sampler.triCount;
+      triAreas = sampler.triAreas;
+      totalArea = sampler.totalArea;
+      cdf = sampler.cdf;
+      // Restore indexArray from cache so triangle indices are available
+      indexArray = sampler.indexArray;
+    } else {
+      triCount = indexArray.length / 3;
+      triAreas = new Float32Array(triCount);
+      totalArea = 0;
+
+      vA = new THREE.Vector3();
+      vB = new THREE.Vector3();
+      vC = new THREE.Vector3();
+      edge1 = new THREE.Vector3();
+      edge2 = new THREE.Vector3();
+
+      for (let t = 0; t < triCount; t++) {
+        const i0 = indexArray[t * 3] * 3;
+        const i1 = indexArray[t * 3 + 1] * 3;
+        const i2 = indexArray[t * 3 + 2] * 3;
+
+        vA.set(posArray[i0], posArray[i0 + 1], posArray[i0 + 2]);
+        vB.set(posArray[i1], posArray[i1 + 1], posArray[i1 + 2]);
+        vC.set(posArray[i2], posArray[i2 + 1], posArray[i2 + 2]);
+
+        edge1.subVectors(vB, vA);
+        edge2.subVectors(vC, vA);
+        const area = edge1.cross(edge2).length() * 0.5;
+        triAreas[t] = area;
+        totalArea += area;
+      }
+
+      // Build cumulative distribution
+      cdf = new Float32Array(triCount);
+      let c = 0;
+      for (let t = 0; t < triCount; t++) {
+        c += triAreas[t];
+        cdf[t] = c;
+      }
+
+      // store sampler data for reuse
+      geometry.userData = geometry.userData || {};
+      geometry.userData._triSampler = {
+        triCount,
+        triAreas,
+        totalArea,
+        cdf,
+        indexArray
+      };
+    }
+
     const positions = new Float32Array(count * 3);
-    
+
+    // Helper to pick triangle by area-weighted random
+    const pickTriangle = (r) => {
+      // Binary search over cdf
+      let lo = 0, hi = triCount - 1;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (r <= cdf[mid]) hi = mid;
+        else lo = mid + 1;
+      }
+      return lo;
+    };
+
     for (let i = 0; i < count; i++) {
       const i3 = i * 3;
-      
-      let vertexIndex;
+
+      // Choose triangle
+      let triIndex;
       if (distributeEvenly) {
-        // Distribute particles evenly across all vertices
-        vertexIndex = Math.floor((i / count) * vertexCount) * 3;
+        // Spread samples evenly across the area using deterministic offsets
+        const areaPerSample = totalArea / count;
+        const sampleTarget = (i + 0.5) * areaPerSample;
+        triIndex = pickTriangle(sampleTarget);
       } else {
-        // Random vertex selection
-        vertexIndex = Math.floor(Math.random() * vertexCount) * 3;
+        const r = Math.random() * totalArea;
+        triIndex = pickTriangle(r);
       }
-      
-      // Get the vertex position
-      let x = vertices[vertexIndex] * radius;
-      let y = vertices[vertexIndex + 1] * radius * heightMultiplier;
-      let z = vertices[vertexIndex + 2] * radius;
-      
-      // Add random offset if specified
+
+      const idx0 = indexArray[triIndex * 3] * 3;
+      const idx1 = indexArray[triIndex * 3 + 1] * 3;
+      const idx2 = indexArray[triIndex * 3 + 2] * 3;
+
+      vA.set(posArray[idx0], posArray[idx0 + 1], posArray[idx0 + 2]);
+      vB.set(posArray[idx1], posArray[idx1 + 1], posArray[idx1 + 2]);
+      vC.set(posArray[idx2], posArray[idx2 + 1], posArray[idx2 + 2]);
+
+      // Sample barycentric coordinates uniformly
+      let r1 = Math.random();
+      let r2 = Math.random();
+      // Ensure uniform sampling on triangle
+      const sqrtR1 = Math.sqrt(r1);
+      const a = 1 - sqrtR1;
+      const b = sqrtR1 * (1 - r2);
+      const cB = sqrtR1 * r2;
+
+      const sampled = new THREE.Vector3();
+      sampled.copy(vA).multiplyScalar(a).addScaledVector(vB, b).addScaledVector(vC, cB);
+
+      let x = sampled.x * radius;
+      let y = sampled.y * radius * heightMultiplier;
+      let z = sampled.z * radius;
+
       if (randomOffset > 0) {
         x += (Math.random() - 0.5) * randomOffset;
         y += (Math.random() - 0.5) * randomOffset;
         z += (Math.random() - 0.5) * randomOffset;
       }
-      
+
       positions[i3] = x;
       positions[i3 + 1] = y;
       positions[i3 + 2] = z;
     }
-    
+
     return positions;
     
   } catch (error) {
