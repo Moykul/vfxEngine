@@ -9,6 +9,7 @@ import { getVfxValues } from './VfxParameters.js';
 import { useVfxSettings } from '../../contexts/VfxSettingsContext.jsx';
 import { useVfxSprites } from '../../hooks/index.js';
 import { useVfxSpritesheets } from '../../hooks/useVfxSpritesheets.js';
+import VFX_PRESETS, { getPreset, listPresets } from './vfxPresets.js';
 
 // Debug flag for real-time updates
 const DEBUG = false;
@@ -118,6 +119,14 @@ const VfxLevaControls = () => {
           motionBlur: { value: vfxValues.motionBlur }
         }),
 
+    // === TRAILS ===
+    'Trails': folder({
+      trailEnabled: { value: getVfxValues().trailEnabled || false, label: 'Enable Trails' },
+      trailLength: { value: getVfxValues().trailLength || 4, min: 1, max: 16, step: 1, label: 'Trail Samples' },
+  trailDamping: { value: getVfxValues().trailDamping || 1.2, min: 0.1, max: 3.0, step: 0.1, label: 'Trail Damping' },
+  trailSize: { value: getVfxValues().trailSize || 0.02, min: 0.0, max: 0.2, step: 0.005, label: 'Trail Size' }
+    }),
+
     // === NEW: ANIMATED TEXTURES (SPRITESHEETS) ===
     'Animated Textures': folder({
       useSpritesheet: { 
@@ -125,7 +134,7 @@ const VfxLevaControls = () => {
         label: '🎬 Use Animated Spritesheet'
       },
       spritesheetName: {
-        value: getVfxValues().spritesheetName || 'fire_explosion_4x4',
+        value: getVfxValues().spritesheetName || 'pow_explosion_5x5',
         options: spritesheetOptions,
         label: 'Spritesheet',
         render: (get) => get('VFX Controls.Animated Textures.useSpritesheet'),
@@ -179,7 +188,7 @@ const VfxLevaControls = () => {
       },
       rotationSpeed: { 
         value: getVfxValues().rotationSpeed, 
-        min: 0, max: 10, step: 0.1,
+        min: 0, max: 36, step: 3,
         label: 'Rotation Speed'
       },
       vortexStrength: { 
@@ -287,6 +296,52 @@ const VfxLevaControls = () => {
   useEffect(() => {
     updateVfxSettings(allVfxControls);
   }, [allVfxControls, updateVfxSettings]);
+
+  // ✅ PRESETS: Add a small controller to pick/apply presets
+  const presetNames = useMemo(() => listPresets(), []);
+
+  // Create Leva controls for selecting a preset and triggering it.
+  // We'll watch the selected name with useEffect and apply changes there
+  // instead of using an inline `onChange` handler inside the Leva schema.
+  const [presetControls, setPresetControls] = useControls('🎛️ Presets', () => ({
+    presetSelection: {
+      value: presetNames[0] || '',
+      options: presetNames
+    },
+    'Trigger Preset': button(() => {
+      setVfxValues(prev => ({ ...prev, trigger: true }));
+      setTimeout(() => setVfxValues(prev => ({ ...prev, trigger: false })), 120);
+    })
+  }));
+
+  // Apply preset when selection changes
+  useEffect(() => {
+    const name = presetControls.presetSelection;
+    if (!name) return;
+    const preset = getPreset(name);
+    if (preset) {
+      console.log('🎛️ Applying preset (effect):', name);
+      // Always update shared settings
+      updateVfxSettings(preset);
+
+      // Filter preset keys to only those that currently exist in Leva controls
+      try {
+        const currentKeys = Object.keys(allVfxControls || {});
+        const filtered = Object.fromEntries(
+          Object.entries(preset).filter(([k]) => currentKeys.includes(k))
+        );
+
+        const missing = Object.entries(preset).filter(([k]) => !currentKeys.includes(k)).map(([k]) => k);
+        if (missing.length) console.warn('🎛️ Preset contains keys not in Leva controls, skipping:', missing);
+
+        if (Object.keys(filtered).length) {
+          setAllVfxControls(filtered);
+        }
+      } catch (err) {
+        console.error('🎛️ Failed to apply preset to Leva controls:', err);
+      }
+    }
+  }, [presetControls.presetSelection, updateVfxSettings, setAllVfxControls]);
 
   // ✅ ENHANCED: Debug effect for real-time updates with spritesheet info
   useEffect(() => {

@@ -20,6 +20,11 @@ uniform float uGravity;
 uniform float uUseGradient;
 uniform float uMotionBlur;
 
+// === TRAIL UNIFORMS ===
+uniform float uTrailEnabled;     // 0.0 = off, 1.0 = on
+uniform float uTrailLength;      // trail length multiplier
+uniform float uTrailDamping;     // damping applied to trail over lifetime
+
 // === NEW SPRITESHEET UNIFORMS ===
 uniform float uUseSpritesheet;
 uniform float uTotalFrames;
@@ -44,6 +49,7 @@ varying float vAlpha;
 varying float vLifetime;      // NEW: Particle lifetime for spritesheet animation
 varying float vRandomSeed;    // NEW: Random seed per particle
 varying vec2 vUv;
+varying vec2 vVelocity;
 
 // === UTILITY FUNCTIONS ===
 
@@ -152,6 +158,15 @@ void main() {
             vec3 velocity = uDirectionalForce + vec3(0.0, uGravity * t, 0.0);
             pos += velocity * uStreakLength * vRandomSeed;
         }
+
+        // Compute a simple velocity approximation for trailing in fragment shader
+        vec3 approxVelocity = uDirectionalForce + vec3(0.0, uGravity * t, 0.0);
+        if (uTornadoEnabled > 0.5) {
+            float rot = aHeightFactor * uSpiralSpin + uTime * uRotationSpeed;
+            approxVelocity.x += -sin(rot) * 0.5 * uVortexStrength;
+            approxVelocity.z += cos(rot) * 0.5 * uVortexStrength;
+        }
+        vVelocity = approxVelocity.xz;
     }
     
     // === COLOR CALCULATION ===

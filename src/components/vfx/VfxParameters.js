@@ -51,7 +51,7 @@ export const getVfxValues = () => ({
   
   // ✅ NEW: Spritesheet properties
   useSpritesheet: false,
-  spritesheetName: 'fire_explosion_4x4',
+  spritesheetName: 'pow_explosion_5x5',
   spritesheetFrameRate: 24,
   spritesheetAnimationMode: 'once', // 'once', 'loop', 'ping-pong'
   spritesheetRandomStart: false,
@@ -77,7 +77,7 @@ export const getVfxValues = () => ({
 // ✅ NEW: Spritesheet-specific utility functions
 export const getSpritesheetDefaults = () => ({
   useSpritesheet: false,
-  spritesheetName: 'fire_explosion_4x4',
+  spritesheetName: 'pow_explosion_5x5',
   spritesheetFrameRate: 24,
   spritesheetAnimationMode: 'once',
   spritesheetRandomStart: false
@@ -96,7 +96,7 @@ export const getAnimationModeValue = (mode) => {
 // ✅ NEW: Recommended spritesheet configurations for different effects
 export const getSpritesheetPresets = () => ({
   explosion: {
-    spritesheetName: 'fire_explosion_4x4',
+    spritesheetName: 'pow_explosion_5x5',
     spritesheetFrameRate: 24,
     spritesheetAnimationMode: 'once',
     spritesheetRandomStart: false

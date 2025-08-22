@@ -29,6 +29,11 @@ const VFXMaterial = shaderMaterial(
     uUseGradient: 0.0,
     uMotionBlur: 0.0,
     uOpacity: 1.0,
+  // === TRAIL UNIFORMS ===
+  uTrailEnabled: 0.0,
+  uTrailLength: 4.0,
+  uTrailDamping: 1.2,
+  uTrailSize: 0.02,
     
     // === NEW SPRITESHEET UNIFORMS ===
     uUseSpritesheet: 0.0,        // Enable/disable spritesheet animation
@@ -383,6 +388,11 @@ const VfxEngine = ({
         }
       }
     }
+  // === TRAIL UNIFORMS SETTING ===
+  material.uniforms.uTrailEnabled.value = effectiveValues.trailEnabled ? 1.0 : 0.0;
+  material.uniforms.uTrailLength.value = effectiveValues.trailLength || 4.0;
+  material.uniforms.uTrailDamping.value = effectiveValues.trailDamping || 1.2;
+  material.uniforms.uTrailSize.value = effectiveValues.trailSize || 0.02;
 
     material.needsUpdate = true;
     

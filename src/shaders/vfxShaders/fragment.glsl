@@ -19,6 +19,12 @@ uniform float uFrameRate;           // Frames per second
 uniform float uAnimationMode;       // 0.0 = once, 1.0 = loop, 2.0 = ping-pong
 uniform float uRandomStartFrame;    // 0.0 = synchronized, 1.0 = random start frames
 
+// === TRAIL UNIFORMS ===
+uniform float uTrailEnabled;    // 0.0 = off, 1.0 = on
+uniform float uTrailLength;     // how many samples to blend for the trail
+uniform float uTrailDamping;    // per-sample damping multiplier
+uniform float uTrailSize;       // base offset multiplier for trail sampling
+
 // === EXISTING TORNADO UNIFORMS ===
 uniform float uTornadoEnabled;
 uniform float uTornadoHeight;
@@ -36,6 +42,7 @@ varying float vAlpha;
 varying vec2 vUv;
 varying float vLifetime;      // Particle lifetime (0.0 to 1.0)
 varying float vRandomSeed;    // Random seed per particle
+varying vec2 vVelocity;
 
 // === SPRITESHEET FUNCTIONS ===
 
@@ -140,7 +147,25 @@ void main() {
     }
     
     // === TEXTURE SAMPLING ===
-    vec4 textureColor = texture2D(uTexture, finalUV);
+    vec4 textureColor = vec4(0.0);
+    if (uTrailEnabled > 0.5) {
+        // Blend several samples along the velocity vector to approximate a trail
+        float samples = max(1.0, floor(uTrailLength));
+        float inv = 1.0 / samples;
+        vec2 vel = normalize(vVelocity + vec2(0.0001));
+        float totalWeight = 0.0;
+        for (float i = 0.0; i < 16.0; i++) { // upper bound loop - GLSL requires const loop
+            if (i >= samples) break;
+            float t = i * inv;
+            float weight = pow(1.0 - t, uTrailDamping + 0.1);
+            vec2 sampleUV = finalUV + vel * t * uTrailLength * uTrailSize;
+            textureColor += texture2D(uTexture, sampleUV) * weight;
+            totalWeight += weight;
+        }
+        textureColor /= max(0.0001, totalWeight);
+    } else {
+        textureColor = texture2D(uTexture, finalUV);
+    }
     
     // === COLOR CALCULATION ===
     vec3 finalColor = calculateFinalColor(vColor, vLifetime, vRandomSeed);

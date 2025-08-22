@@ -1,5 +1,5 @@
-// hooks/useVfxSpritesheets.js - Debug version to find the issue
-import { useState, useEffect, useMemo } from 'react';
+// hooks/useVfxSpritesheets.js - Enhanced debug version to find the issue
+import { useState, useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 
 // ✅ IMPORT: Your actual spritesheets.json file
@@ -7,53 +7,55 @@ import spritesheetDefinitions from '../assets/spritesheets/spritesheets.json';
 
 // ✅ IMPORT: Your actual spritesheet images
 import powExplosion from '../assets/spritesheets/POW.png';
+import bamExplosion from '../assets/spritesheets/BAM.png';  // Fixed path to match actual file
+import boomExplosion from '../assets/spritesheets/BOOM.png';
 
 // ✅ MAP: Image imports to filenames
 const importSpritesheetTextures = {
   'POW.png': powExplosion,
+  'BAM.png': bamExplosion,  // Fixed key to match texture name in JSON
+  'BOOM.png': boomExplosion,
 };
 
-// 🔍 DEBUG: Log what we imported
-console.log('🔍 DEBUG - spritesheetDefinitions:', spritesheetDefinitions);
-console.log('🔍 DEBUG - powExplosion import:', powExplosion);
-console.log('🔍 DEBUG - importSpritesheetTextures:', importSpritesheetTextures);
+Object.entries(spritesheetDefinitions).forEach(([key, def]) => {
+  console.log(`  - ${key}: texture=${def.texture}, mapped=${!!importSpritesheetTextures[def.texture]}`);
+});
 
 export const useVfxSpritesheets = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [spritesheets, setSpritesheets] = useState([]);
+  
+  // Add a counter to track re-renders
+  const renderCountRef = useRef(0);
 
   const loadActualSpritesheets = async () => {
     const loadedSpritesheets = [];
-    
-    console.log('🔍 DEBUG - Starting to load spritesheets...');
-    console.log('🔍 DEBUG - spritesheetDefinitions entries:', Object.entries(spritesheetDefinitions));
-    
     for (const [key, definition] of Object.entries(spritesheetDefinitions)) {
-      console.log(`🔍 DEBUG - Processing: ${key}`, definition);
+      console.log(`\n� Processing spritesheet: ${key} (${definition.name})`);
+      console.log(`  - Looking for texture: "${definition.texture}"`);
       
       try {
         const textureUrl = importSpritesheetTextures[definition.texture];
-        console.log(`🔍 DEBUG - Looking for texture: ${definition.texture}`);
-        console.log(`🔍 DEBUG - Found textureUrl:`, textureUrl);
         
-        if (!textureUrl) {
-          console.warn(`⚠️ Texture not imported: ${definition.texture}`);
+        if (textureUrl) {
+          console.log(`  ✓ Found texture URL: ${typeof textureUrl === 'string' ? textureUrl.substring(0, 30) + '...' : '[object]'}`);
+        } else {
+          console.warn(`  ⚠️ No matching texture import found for: ${definition.texture}`);
+          console.log(`  - Available textures: ${Object.keys(importSpritesheetTextures).join(', ')}`);
           continue;
         }
         
-        console.log(`🔄 Loading texture for: ${definition.name}`);
+        console.log(`🔄 Loading texture for: ${definition.name} (${definition.texture})`);
         
         // Load the actual texture
         const texture = await new Promise((resolve, reject) => {
           new THREE.TextureLoader().load(
             textureUrl,
             (loadedTexture) => {
-              console.log(`✅ Loaded spritesheet: ${definition.name}`);
               resolve(loadedTexture);
             },
             undefined,
             (error) => {
-              console.error(`❌ Failed to load: ${definition.name}`, error);
               reject(error);
             }
           );
@@ -84,8 +86,6 @@ export const useVfxSpritesheets = () => {
         console.error(`❌ Failed to load spritesheet: ${definition.name}`, error);
       }
     }
-    
-    console.log('🔍 DEBUG - loadActualSpritesheets result:', loadedSpritesheets);
     return loadedSpritesheets;
   };
 
@@ -93,20 +93,14 @@ export const useVfxSpritesheets = () => {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     const demoSpritesheets = [];
-    
-    console.log('🔍 DEBUG - Creating demo spritesheets...');
-    
+
     // Only create demos for entries that don't have real imports
     for (const [key, definition] of Object.entries(spritesheetDefinitions)) {
       const hasRealTexture = importSpritesheetTextures[definition.texture];
-      console.log(`🔍 DEBUG - ${key}: hasRealTexture = ${!!hasRealTexture}`);
       
       if (hasRealTexture) {
-        console.log(`🔍 DEBUG - Skipping demo for ${key} (has real texture)`);
         continue; // Skip if we have the real texture
       }
-      
-      console.log(`🔍 DEBUG - Creating demo for ${key}`);
       
       // Create demo version
       canvas.width = 512;
@@ -164,8 +158,6 @@ export const useVfxSpritesheets = () => {
       
       demoSpritesheets.push(texture);
     }
-    
-    console.log('🔍 DEBUG - createDemoSpritesheets result:', demoSpritesheets);
     return demoSpritesheets;
   };
 
@@ -187,7 +179,8 @@ export const useVfxSpritesheets = () => {
   useEffect(() => {
     const initializeSpritesheets = async () => {
       setIsLoading(true);
-      
+      renderCountRef.current += 1;
+
       try {
         console.log('🔍 DEBUG - Initializing spritesheets...');
         
@@ -203,13 +196,27 @@ export const useVfxSpritesheets = () => {
         const allSpritesheets = [...actualSpritesheets, ...demoSpritesheets];
         console.log('🔍 DEBUG - allSpritesheets:', allSpritesheets);
         
-        setSpritesheets(allSpritesheets);
-        console.log(`🎬 Loaded ${allSpritesheets.length} spritesheets:`, {
-          actual: actualSpritesheets.length,
-          demo: demoSpritesheets.length,
-          actualNames: actualSpritesheets.map(s => s.name),
-          demoNames: demoSpritesheets.map(s => s.name)
+        // Log each spritesheet status to confirm they're all loading
+        console.log('🎯 ALL SPRITESHEET STATUS:');
+        allSpritesheets.forEach(sheet => {
+          console.log(`📊 ${sheet.name}:`, {
+            key: sheet.spritesheetKey,
+            isDemo: sheet.name.includes('Demo'),
+            frames: `${sheet.framesX}x${sheet.framesY}`,
+            totalFrames: sheet.totalFrames,
+            category: sheet.category
+          });
         });
+        
+        // Count by category
+        const categoryCounts = {};
+        allSpritesheets.forEach(s => {
+          categoryCounts[s.category] = (categoryCounts[s.category] || 0) + 1;
+        });
+        console.log('📊 Spritesheet counts by category:', categoryCounts);
+        
+        setSpritesheets(allSpritesheets);
+
         
       } catch (error) {
         console.error('❌ Failed to initialize spritesheets:', error);
@@ -223,22 +230,34 @@ export const useVfxSpritesheets = () => {
     initializeSpritesheets();
   }, []);
 
-  // Create options for UI selection
+  // Create options for UI selection with improved logging
   const spritesheetOptions = useMemo(() => {
+    console.log(`🔄 BUILDING UI OPTIONS: Total spritesheets available = ${spritesheets.length}`);
+    
     const options = {};
+    
+    if (spritesheets.length === 0) {
+      console.warn('⚠️ NO SPRITESHEETS AVAILABLE FOR UI');
+      return { 'No spritesheets available': '' };
+    }
     
     // Group by category
     const categories = [...new Set(spritesheets.map(s => s.category))].sort();
+    console.log(`🎬 Found ${categories.length} categories for UI: ${categories.join(', ')}`);
     
     categories.forEach(category => {
       options[`-- ${category.toUpperCase()} --`] = '';
-      spritesheets
-        .filter(s => s.category === category)
-        .forEach(spritesheet => {
-          options[spritesheet.name] = spritesheet.spritesheetKey;
-        });
+      const categorySpritesheets = spritesheets.filter(s => s.category === category);
+      
+      console.log(`📁 Category '${category}' - ${categorySpritesheets.length} spritesheets:`);
+      
+      categorySpritesheets.forEach(spritesheet => {
+        options[spritesheet.name] = spritesheet.spritesheetKey;
+        console.log(`  • ${spritesheet.name} → ${spritesheet.spritesheetKey}`);
+      });
     });
     
+    console.log('✅ Final spritesheet options:', Object.keys(options).filter(k => !k.startsWith('--')));
     return options;
   }, [spritesheets]);
 
@@ -248,12 +267,25 @@ export const useVfxSpritesheets = () => {
     return categories.sort();
   }, [spritesheets]);
 
-  // Function to get spritesheet by name or key
+  // Function to get spritesheet by name or key with enhanced logging
   const getSpritesheetByName = (nameOrKey) => {
+    
     const spritesheet = spritesheets.find(s => 
       s.name === nameOrKey || s.spritesheetKey === nameOrKey
     );
-    return spritesheet || spritesheets[0];
+    
+    if (spritesheet) {
+      console.log(`✅ Found spritesheet: ${spritesheet.name} (${spritesheet.spritesheetKey})`);
+    } else {
+      console.warn(`⚠️ Spritesheet not found: "${nameOrKey}", falling back to first available`);
+      if (spritesheets.length > 0) {
+        console.log(`ℹ️ Using fallback: ${spritesheets[0].name} (${spritesheets[0].spritesheetKey})`);
+      } else {
+        console.error('❌ No spritesheets available for fallback!');
+      }
+    }
+    
+    return spritesheet || (spritesheets.length > 0 ? spritesheets[0] : null);
   };
 
   // Function to get spritesheets by category
