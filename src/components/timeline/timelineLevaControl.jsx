@@ -105,6 +105,7 @@ const TimelineController = () => {
 
   const [vfxValues, setVfxValues] = useControls('VFX Transform', () => levaConfig);
 
+
   // ✅ PROVEN PATTERN: Generate timeline model from parameter definitions (exact R3F pattern)
   const timelineModel = useMemo(() => {
     const rows = Object.entries(parameterDefinitions).map(([levaKey, def]) => ({

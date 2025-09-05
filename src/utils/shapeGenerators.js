@@ -622,7 +622,7 @@ export const generatePositions = async (shape, count, radius, height = 2, angle 
     frequency = 3,
     amplitude = 0.5,
     reverse = false,
-    glbPath = '/models/sqMesh.glb', // Default path for GLB
+    glbPath = '/models/sqShield.glb', // Default path for GLB
     // === TORNADO PARAMETERS ===
     tornadoHeight = 8.0,
     spiralBranches = 3,

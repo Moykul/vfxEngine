@@ -5,16 +5,16 @@
 export const VFX_PRESETS = {
   "Pow Explosion": {
     // Comic-style POW explosion using the POW spritesheet
-    pCount: 600,
+    pCount: 2000,
     duration: 1.2,
-    pSize: 0.8,
+    pSize: 0.1,
     spread: 3.5,
     pAge: 1.0,
     sizeVariation: 0.6,
     timeVariation: 0.3,
     color: '#ffffff',
     colorEnd: '#ff7a00',
-    useGradient: true,
+    useGradient: false,
     opacity: 1.0,
     blendMode: 0,
     gravity: -0.5,
@@ -23,13 +23,13 @@ export const VFX_PRESETS = {
     directionalForceY: 1.2,
     directionalForceZ: 0,
     streakLength: 0.2,
-    shape: 'explosion',
+    shape: 'model',
     shapeHeight: 1.5,
     animationPreset: 'burst',
     particleTexture: 'Circle',
 
     // spritesheet settings
-    useSpritesheet: true,
+    useSpritesheet: false,
     spritesheetName: 'pow_explosion_5x5',
     spritesheetFrameRate: 24,
     spritesheetAnimationMode: 'once',

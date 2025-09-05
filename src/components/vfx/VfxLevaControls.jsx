@@ -15,11 +15,11 @@ import VFX_PRESETS, { getPreset, listPresets } from './vfxPresets.js';
 const DEBUG = false;
 
 const VfxLevaControls = () => {
-  const [vfxValues, setVfxValues] = useState(() => getVfxValues());
-  const fileInputRef = useRef();
-  
-  // ✅ SHARED: Use shared VFX settings context
   const { vfxSettings, updateVfxSettings } = useVfxSettings();
+  const [vfxValues, setVfxValues] = useState(() => getVfxValues());
+  
+  const fileInputRef = useRef();
+
   
   // Load all available textures and spritesheets
   const { sprites, spriteCategories } = useVfxSprites();
@@ -210,6 +210,11 @@ const VfxLevaControls = () => {
 
   const [allVfxControls, setAllVfxControls] = useControls('VFX Controls', () => levaConfig);
 
+    // ✅ SYNC: When shared context changes (from other modes), update local state
+  // useEffect(() => {
+  //   setAllVfxControls(vfxSettings);
+  // }, [vfxSettings, setAllVfxControls]);
+
   // ✅ FORCE UPDATE: When spritesheetOptions becomes populated, force Leva to refresh
   useEffect(() => {
     const hasSpritesheetOptions = Object.keys(spritesheetOptions).length > 0;
@@ -281,11 +286,11 @@ const VfxLevaControls = () => {
   useControls('💾 File Operations', {
     'Save Settings': button(() => {
       const vfxData = {
-        vfxSettings: allVfxControls
+        vfxSettings: vfxSettings  // ✅ FIXED: Use shared context instead of allVfxControls
       };
       
       fileManager.saveJSON(vfxData, 'vfx-settings.json');
-      console.log('💾 VFX settings saved (including spritesheet settings)');
+      console.log('💾 VFX settings saved from shared context (including spritesheet settings)');
     }),
     'Load Settings': button(() => {
       if (fileInputRef.current) fileInputRef.current.click();
