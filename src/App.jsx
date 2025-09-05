@@ -40,8 +40,12 @@ const App = () => {
   // ✅ CONDITIONAL RENDERING: Switch between components based on mode
   return (
     <VfxSettingsProvider>
-      {modeControls.mode === 'vfx' && <VfxLevaControls />}
-      {modeControls.mode === 'timeline' && <TimelineController />}
+      <div style={{ display: modeControls.mode === 'vfx' ? 'block' : 'none' }}>
+        <VfxLevaControls />
+      </div>
+      <div style={{ display: modeControls.mode === 'timeline' ? 'block' : 'none' }}>
+        <TimelineController />
+      </div>
     </VfxSettingsProvider>
   );
 };

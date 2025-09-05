@@ -177,7 +177,7 @@ const TimelineController = () => {
         metadata: {
           version: "1.0",
           created: new Date().toISOString(),
-          duration: 5000,
+          duration: (vfxSettings.duration || 3.0) * 1000,
           description: "VFX Animation with Timeline"
         }
       };
@@ -403,7 +403,7 @@ const TimelineController = () => {
       <AnimationTimeline
         ref={timelineRef}
         visible={timelineVisible}
-        duration={5000}
+        duration={(vfxSettings.duration || 3.0) * 1000}
         levaValues={vfxValues}
         onLevaUpdate={handleLevaUpdate}
         onTimeChange={setCurrentTime}

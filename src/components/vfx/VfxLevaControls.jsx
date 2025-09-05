@@ -16,9 +16,22 @@ const DEBUG = false;
 
 const VfxLevaControls = () => {
   const { vfxSettings, updateVfxSettings } = useVfxSettings();
-  const [vfxValues, setVfxValues] = useState(() => getVfxValues());
+  // ✅ FIXED: Initialize with context settings, but safely
+  const [vfxValues, setVfxValues] = useState(() => {
+    // Ensure we have valid settings, fall back to defaults if needed
+    return Object.keys(vfxSettings || {}).length > 0 ? vfxSettings : getVfxValues();
+  });
   
   const fileInputRef = useRef();
+
+  // ✅ HELPER: Get value from context with fallback to defaults
+  const getConfigValue = useCallback((key, defaultValue) => {
+    if (!vfxSettings || typeof vfxSettings !== 'object') {
+      return getVfxValues()[key] !== undefined ? getVfxValues()[key] : defaultValue;
+    }
+    return vfxSettings[key] !== undefined ? vfxSettings[key] : 
+           (getVfxValues()[key] !== undefined ? getVfxValues()[key] : defaultValue);
+  }, [vfxSettings]);
 
   
   // Load all available textures and spritesheets
@@ -60,26 +73,26 @@ const VfxLevaControls = () => {
   const levaConfig = useMemo(() => ({
     // === PARTICLES ===
     'Particles': folder({
-      pCount: { value: vfxValues.pCount, min: 1, max: 4000, step: 10 },
-      duration: { value: vfxValues.duration, min: 0.5, max: 10.0, step: 0.1 },
+      pCount: { value: vfxSettings.pCount || 800, min: 1, max: 4000, step: 10 },
+      duration: { value: vfxSettings.duration || 3.0, min: 0.5, max: 10.0, step: 0.1 },
       pSize: { 
-        value: vfxValues.pSize, 
+        value: vfxSettings.pSize || 0.4, 
         min: 0.01, 
         max: 1.0, 
         step: 0.01,
         label: 'Particle Size (real-time)'
       },
-      spread: { value: getVfxValues().spread, min: 0.5, max: 10, step: 0.1 },
-      pAge: { value: getVfxValues().pAge, min: 0.1, max: 3.0, step: 0.1 },
-      sizeVariation: { value: getVfxValues().sizeVariation, min: 0.0, max: 1.0, step: 0.1 },
-      timeVariation: { value: getVfxValues().timeVariation, min: 0.0, max: 1.0, step: 0.1 }
+      spread: { value: vfxSettings.spread || 2, min: 0.5, max: 10, step: 0.1 },
+      pAge: { value: vfxSettings.pAge || 1.0, min: 0.1, max: 3.0, step: 0.1 },
+      sizeVariation: { value: vfxSettings.sizeVariation || 0.5, min: 0.0, max: 1.0, step: 0.1 },
+      timeVariation: { value: getConfigValue('timeVariation', 0.4), min: 0.0, max: 1.0, step: 0.1 }
     }),
 
     // === COLORS & EFFECTS ===
     'Colors & Effects': folder({
-      color: { value: getVfxValues().color },
-      colorEnd: { value: getVfxValues().colorEnd },
-      useGradient: { value: getVfxValues().useGradient },
+      color: { value: getConfigValue('color', '#ff6030') },
+      colorEnd: { value: getConfigValue('colorEnd', '#ff0030') },
+      useGradient: { value: getConfigValue('useGradient', false) },
       opacity: { value: vfxValues.opacity, min: 0.0, max: 1.0, step: 0.1 },
       blendMode: { 
         value: vfxValues.blendMode,
@@ -206,24 +219,94 @@ const VfxLevaControls = () => {
         label: 'Height Color Gradient'
       }
     })
-  }), [vfxValues, allTextureOptions, spritesheetOptions, animationModeOptions]);
+  }), [vfxSettings, allTextureOptions, spritesheetOptions, animationModeOptions, getConfigValue]);
 
   const [allVfxControls, setAllVfxControls] = useControls('VFX Controls', () => levaConfig);
 
-    // ✅ SYNC: When shared context changes (from other modes), update local state
-  // useEffect(() => {
-  //   setAllVfxControls(vfxSettings);
-  // }, [vfxSettings, setAllVfxControls]);
+  // ✅ SYNC: When shared context changes (from other modes), update local state
+  useEffect(() => {
+    if (vfxSettings && typeof vfxSettings === 'object' && Object.keys(vfxSettings).length > 0) {
+      setVfxValues(vfxSettings);
+    }
+  }, [vfxSettings]);
+
+  // ✅ INIT: Initialize Leva controls with context values on mount
+  useEffect(() => {
+    // On initial mount, set Leva controls to match context
+    if (!vfxSettings || typeof vfxSettings !== 'object') {
+      console.log('🔄 VfxSettings not ready, skipping initialization');
+      return;
+    }
+    
+    const contextKeys = Object.keys(vfxSettings);
+    if (contextKeys.length > 0) {
+      console.log('🔄 Initializing Leva controls with context values');
+      
+      // Only set values that are safe for Leva controls
+      const safeUpdates = {};
+      contextKeys.forEach(key => {
+        const value = vfxSettings[key];
+        // Only include primitive values, not objects or functions
+        if (value !== undefined && value !== null && 
+            typeof value !== 'function' && typeof value !== 'object') {
+          safeUpdates[key] = value;
+        }
+      });
+      
+      if (Object.keys(safeUpdates).length > 0) {
+        try {
+          setAllVfxControls(safeUpdates);
+        } catch (error) {
+          console.warn('🔄 Failed to initialize Leva controls:', error);
+        }
+      }
+    }
+  }, []); // Only run on mount
+
+  // ✅ SYNC: Update Leva controls when context changes to match loaded settings
+  useEffect(() => {
+    if (!vfxSettings || typeof vfxSettings !== 'object') {
+      return;
+    }
+    
+    // Build updates object for Leva controls from context settings
+    const levaUpdates = {};
+    
+    // Map context settings to Leva control structure - only safe values
+    Object.keys(vfxSettings).forEach(key => {
+      const value = vfxSettings[key];
+      if (value !== undefined && value !== null && 
+          typeof value !== 'function' && typeof value !== 'object') {
+        levaUpdates[key] = value;
+      }
+    });
+    
+    if (Object.keys(levaUpdates).length > 0) {
+      try {
+        setAllVfxControls(levaUpdates);
+      } catch (error) {
+        console.warn('🔄 Failed to sync Leva controls:', error);
+      }
+    }
+  }, [vfxSettings, setAllVfxControls]);
 
   // ✅ FORCE UPDATE: When spritesheetOptions becomes populated, force Leva to refresh
   useEffect(() => {
     const hasSpritesheetOptions = Object.keys(spritesheetOptions).length > 0;
     if (hasSpritesheetOptions) {
       console.log('🔄 Spritesheet options populated, forcing Leva update');
-      // Force regeneration by updating the config
-      setAllVfxControls({}); // This triggers Leva to rebuild with new options
+      // Force regeneration by updating the config - but safely
+      try {
+        // Don't pass empty object, instead trigger a re-render by updating with current values
+        const currentValues = { ...allVfxControls };
+        if (Object.keys(currentValues).length > 0) {
+          setAllVfxControls(currentValues);
+        }
+      } catch (error) {
+        console.warn('🔄 Failed to update spritesheet options:', error);
+      }
     }
-  }, [spritesheetOptions, setAllVfxControls]);
+  }, [spritesheetOptions, allVfxControls, setAllVfxControls]);
 
   // ✅ ENHANCED: Local values for VfxEngine (includes spritesheet data)
   const allVfxValues = useMemo(() => ({
