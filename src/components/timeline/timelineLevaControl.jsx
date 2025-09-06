@@ -31,29 +31,40 @@ const TimelineController = () => {
     return vfxSettings[key] !== undefined ? vfxSettings[key] : defaultValue;
   }, [vfxSettings]);
 
-  // ✅ ENHANCED: Combined texture options (basic + extended)
+  // ✅ ENHANCED: Combined texture options (basic + extended) - FIXED to match VfxLevaControls format
   const allTextureOptions = useMemo(() => {
-    const basicTextures = ['Circle', 'Square', 'Triangle', 'Star', 'Heart', 'Diamond'];
+    console.log('🖼️ Building texture options - sprites:', sprites?.length || 0, 'categories:', spriteCategories?.length || 0);
     
-    if (!sprites || sprites.length === 0) {
-      return basicTextures;
+    const options = {};
+    
+    // Add basic particle textures first
+    options['-- BASIC PARTICLES --'] = '';
+    const basicTextures = { 
+      'Circle': 'Circle', 
+      'Heart': 'Heart', 
+      'Point': 'Point', 
+      'Point Cross': 'Point Cross', 
+      'Point Cross 2': 'Point Cross 2', 
+      'Ring': 'Ring', 
+      'Star': 'Star', 
+      'Star 2': 'Star 2' 
+    };
+    Object.assign(options, basicTextures);
+    
+    // Add extended textures by category
+    if (sprites && sprites.length > 0) {
+      spriteCategories.forEach(category => {
+        options[`-- ${category.toUpperCase()} --`] = '';
+        const categorySprites = sprites.filter(sprite => sprite.category === category);
+        console.log(`🖼️ Category ${category}:`, categorySprites.length, 'sprites');
+        categorySprites.forEach(sprite => {
+          options[sprite.name] = sprite.name;
+        });
+      });
     }
-
-    // Group sprites by category
-    const categorizedSprites = sprites.reduce((acc, sprite) => {
-      const category = sprite.category || 'Other';
-      if (!acc[category]) acc[category] = [];
-      acc[category].push(sprite.name);
-      return acc;
-    }, {});
-
-    // Create combined options object
-    const combined = [...basicTextures];
-    Object.entries(categorizedSprites).forEach(([category, spriteNames]) => {
-      combined.push(...spriteNames);
-    });
-
-    return combined;
+    
+    console.log('🖼️ Final texture options:', Object.keys(options).length, 'total options');
+    return options;
   }, [sprites, spriteCategories]);
   
   // ✅ PROVEN PATTERN: Enhanced parameter definitions with organized grouping (from R3F reference)
@@ -302,23 +313,50 @@ const TimelineController = () => {
     })
   });
 
-  // ✅ PRESETS: Add preset controls
-  const presetNames = useMemo(() => listPresets(), []);
+  // ✅ PRESETS: Add preset controls - FIXED logic issue
+  const presetNames = useMemo(() => {
+    const names = listPresets();
+    console.log('🎛️ Available presets:', names);
+    return names;
+  }, []);
   const [presetControls, setPresetControls] = useControls('🎛️ Presets', () => ({
     presetSelection: {
       value: presetNames[0] || '',
       options: presetNames
     },
     'Apply Preset': button(() => {
-      if (presetControls.presetSelection) {
-        const preset = getPreset(presetControls.presetSelection);
-        if (preset) {
-          updateVfxSettings(preset);
-          setAllVfxControls(preset);
-        }
-      }
+      // This will trigger the useEffect below when the button is clicked
+      // We can't access presetControls.presetSelection here yet
+      console.log('🎛️ Apply Preset button clicked, current selection:', presetControls.presetSelection);
     })
   }));
+
+  // ✅ FIXED: Apply preset when selection changes OR when button is clicked
+  useEffect(() => {
+    const selectedName = presetControls.presetSelection;
+    if (!selectedName) return;
+    
+    const preset = getPreset(selectedName);
+    if (preset) {
+      console.log('🎛️ Applying preset:', selectedName);
+      // Update shared context
+      updateVfxSettings(preset);
+      // Update local Leva controls
+      try {
+        // Filter preset to only include keys that exist in current controls
+        const filteredPreset = {};
+        Object.keys(preset).forEach(key => {
+          // Only include VFX parameters, not transform parameters
+          if (!['positionX', 'positionY', 'positionZ', 'rotationX', 'rotationY', 'rotationZ', 'scale', 'opacity'].includes(key)) {
+            filteredPreset[key] = preset[key];
+          }
+        });
+        setAllVfxControls(filteredPreset);
+      } catch (error) {
+        console.warn('⚠️ Could not apply all preset values to Leva controls:', error);
+      }
+    }
+  }, [presetControls.presetSelection, updateVfxSettings, setAllVfxControls]);
 
   // ✅ UPDATE: Sync VFX controls with context
   useEffect(() => {
