@@ -16,9 +16,7 @@ const AnimationTimeline = React.forwardRef(({
   initialModel = null,
   normalizeFunctions = null,
   parameterMapping = null,
-  shouldPlay = false,
-  // NEW: VFX trigger function
-  triggerVfx = null
+  shouldPlay = false
 }, ref) => {
   const timelineRef = useRef(null);
   const containerRef = useRef(null);
@@ -319,11 +317,7 @@ const AnimationTimeline = React.forwardRef(({
   // [Previous play, stop, drag code unchanged]
   
   const play = useCallback(() => {
-    console.log('🎵 AnimationTimeline play() called - isInitialized:', isInitialized, 'isPlaying:', isPlaying);
-    if (!timeline || !isInitialized || isPlaying) {
-      console.log('🚫 Play blocked - timeline:', !!timeline, 'isInitialized:', isInitialized, 'isPlaying:', isPlaying);
-      return;
-    }
+    if (!timeline || !isInitialized || isPlaying) return;
     if (playbackRef.current) {
       cancelAnimationFrame(playbackRef.current);
       playbackRef.current = null;
@@ -334,17 +328,9 @@ const AnimationTimeline = React.forwardRef(({
       timeline.setTime(0);
       setCurrentTime(0);
     }
-    console.log('🎵 Setting isPlaying to true and calling onPlaybackChange(true)');
     setIsPlaying(true);
     isPlayingRef.current = true;
     onPlaybackChange(true);
-    
-    // ✅ NEW: Also trigger VFX animation (same as "Fire Current Settings!" button)
-    if (triggerVfx) {
-      console.log('🎵 Timeline play button also triggering VFX');
-      triggerVfx();
-    }
-    
     let performanceStartTime = null;
     const animate = (timestamp) => {
       try {

@@ -1,5 +1,5 @@
 import React, { useState, useCallback, useRef, useMemo, createContext, useContext, useEffect } from 'react';
-import { useControls, button } from 'leva';
+import { useControls, button, folder } from 'leva';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls, Grid, Stats } from '@react-three/drei';
 import { Suspense } from 'react';
@@ -9,6 +9,8 @@ import fileManager from './fileManager';
 import { useVfxSettings } from '../../contexts/VfxSettingsContext.jsx';
 import { useVfxSprites } from '../../hooks/index.js';
 import { useVfxSpritesheets } from '../../hooks/useVfxSpritesheets.js';
+import { getVfxValues } from '../vfx/VfxParameters.js';
+import VFX_PRESETS, { getPreset, listPresets } from '../vfx/vfxPresets.js';
 
 // Debug flag
 const DEBUG = false;
@@ -20,6 +22,39 @@ const TimelineController = () => {
   // ✅ FIXED: Add sprite hooks to match VfxLevaControls
   const { sprites, spriteCategories } = useVfxSprites();
   const { spritesheets, spritesheetOptions, animationModeOptions, getSpritesheetMetadata } = useVfxSpritesheets();
+  
+  // ✅ HELPER: Get value from context with fallback to defaults
+  const getConfigValue = useCallback((key, defaultValue) => {
+    if (!vfxSettings || typeof vfxSettings !== 'object') {
+      return getVfxValues()[key] !== undefined ? getVfxValues()[key] : defaultValue;
+    }
+    return vfxSettings[key] !== undefined ? vfxSettings[key] : defaultValue;
+  }, [vfxSettings]);
+
+  // ✅ ENHANCED: Combined texture options (basic + extended)
+  const allTextureOptions = useMemo(() => {
+    const basicTextures = ['Circle', 'Square', 'Triangle', 'Star', 'Heart', 'Diamond'];
+    
+    if (!sprites || sprites.length === 0) {
+      return basicTextures;
+    }
+
+    // Group sprites by category
+    const categorizedSprites = sprites.reduce((acc, sprite) => {
+      const category = sprite.category || 'Other';
+      if (!acc[category]) acc[category] = [];
+      acc[category].push(sprite.name);
+      return acc;
+    }, {});
+
+    // Create combined options object
+    const combined = [...basicTextures];
+    Object.entries(categorizedSprites).forEach(([category, spriteNames]) => {
+      combined.push(...spriteNames);
+    });
+
+    return combined;
+  }, [sprites, spriteCategories]);
   
   // ✅ PROVEN PATTERN: Enhanced parameter definitions with organized grouping (from R3F reference)
   const parameterDefinitions = useMemo(() => ({
@@ -111,6 +146,187 @@ const TimelineController = () => {
   }, [parameterDefinitions]);
 
   const [vfxValues, setVfxValues] = useControls('VFX Transform', () => levaConfig);
+
+  // ✅ ENHANCED: VFX Controls (all the missing controls from VfxLevaControls)
+  const vfxConfig = useMemo(() => ({
+    'Particles': folder({
+      pCount: { value: vfxSettings.pCount || 800, min: 1, max: 4000, step: 10 },
+      duration: { value: vfxSettings.duration || 3.0, min: 0.5, max: 10.0, step: 0.1 },
+      pSize: { 
+        value: vfxSettings.pSize || 0.4, 
+        min: 0.01, 
+        max: 1.0, 
+        step: 0.01,
+        label: 'Particle Size (real-time)'
+      },
+      spread: { value: vfxSettings.spread || 2, min: 0.5, max: 10, step: 0.1 },
+      pAge: { value: vfxSettings.pAge || 1.0, min: 0.1, max: 3.0, step: 0.1 },
+      sizeVariation: { value: vfxSettings.sizeVariation || 0.5, min: 0.0, max: 1.0, step: 0.1 },
+      timeVariation: { value: getConfigValue('timeVariation', 0.4), min: 0.0, max: 1.0, step: 0.1 }
+    }),
+    'Colors & Effects': folder({
+      color: { value: getConfigValue('color', '#ff6030') },
+      colorEnd: { value: getConfigValue('colorEnd', '#ff0030') },
+      useGradient: { value: getConfigValue('useGradient', false) },
+      blendMode: { 
+        value: getConfigValue('blendMode', 0),
+        options: { 'Additive': 0, 'Normal': 1, 'Multiply': 2, 'Subtractive': 3 }
+      }
+    }),
+    'Physics': folder({
+      gravity: { value: getConfigValue('gravity', 0), min: -15.0, max: 15.0, step: 0.1 },
+      turbulence: { value: getConfigValue('turbulence', 0), min: 0.0, max: 5.0, step: 0.1 },
+      directionalForceX: { value: getConfigValue('directionalForceX', 0), min: -10.0, max: 10.0, step: 0.1 },
+      directionalForceY: { value: getConfigValue('directionalForceY', 0), min: -10.0, max: 10.0, step: 0.1 },
+      directionalForceZ: { value: getConfigValue('directionalForceZ', 0), min: -10.0, max: 10.0, step: 0.1 },
+      streakLength: { value: getConfigValue('streakLength', 0), min: 0.0, max: 2.0, step: 0.1 }
+    }),
+    'Shape & Texture': folder({
+      shape: {
+        value: getConfigValue('shape', 'explosion'),
+        options: ['explosion', 'sphere', 'box', 'cone', 'circle', 'square', 'spiral', 'wave', 'glb', 'model', 'tornado']
+      },
+      shapeHeight: { value: getConfigValue('shapeHeight', 2.0), min: 0.5, max: 10.0, step: 0.1 },
+      shapeAngle: { value: getConfigValue('shapeAngle', 0), min: 0, max: 360, step: 1 },
+      heightMultiplier: { value: getConfigValue('heightMultiplier', 1.0), min: 0.1, max: 5.0, step: 0.1 },
+      animationPreset: {
+        value: getConfigValue('animationPreset', 'none'),
+        options: ['none', 'fadeIn', 'fadeOut', 'spiral', 'burst', 'gravity']
+      },
+      particleTexture: {
+        value: getConfigValue('particleTexture', 'Circle'),
+        options: allTextureOptions,
+        label: 'Texture (Basic + Extended)'
+      },
+      motionBlur: { value: getConfigValue('motionBlur', false) }
+    }),
+    'Trails': folder({
+      trailEnabled: { value: getConfigValue('trailEnabled', false), label: 'Enable Trails' },
+      trailLength: { value: getConfigValue('trailLength', 4), min: 1, max: 16, step: 1, label: 'Trail Samples' },
+      trailDamping: { value: getConfigValue('trailDamping', 1.2), min: 0.1, max: 3.0, step: 0.1, label: 'Trail Damping' },
+      trailSize: { value: getConfigValue('trailSize', 0.02), min: 0.0, max: 0.2, step: 0.005, label: 'Trail Size' }
+    }),
+    'Animated Textures': folder({
+      useSpritesheet: { 
+        value: getConfigValue('useSpritesheet', false),
+        label: '🎬 Use Animated Spritesheet'
+      },
+      spritesheetName: {
+        value: getConfigValue('spritesheetName', 'pow_explosion_5x5'),
+        options: spritesheetOptions,
+        label: 'Spritesheet',
+        render: (get) => get('VFX Controls.Animated Textures.useSpritesheet'),
+      },
+      spritesheetFrameRate: {
+        value: getConfigValue('spritesheetFrameRate', 24),
+        min: 1,
+        max: 60,
+        step: 1,
+        label: 'Frame Rate (fps)',
+        render: (get) => get('VFX Controls.Animated Textures.useSpritesheet'),
+      },
+      spritesheetAnimationMode: {
+        value: getConfigValue('spritesheetAnimationMode', 'once'),
+        options: animationModeOptions,
+        label: 'Animation Mode',
+        render: (get) => get('VFX Controls.Animated Textures.useSpritesheet'),
+      },
+      spritesheetRandomStart: {
+        value: getConfigValue('spritesheetRandomStart', false),
+        label: 'Random Start Frames',
+        render: (get) => get('VFX Controls.Animated Textures.useSpritesheet'),
+      }
+    }),
+    'Tornado': folder({
+      tornadoEnabled: { 
+        value: getConfigValue('tornadoEnabled', false),
+        label: '🌪️ Enable Tornado'
+      },
+      tornadoHeight: { 
+        value: getConfigValue('tornadoHeight', 8.0), 
+        min: 1, max: 20, step: 0.1,
+        label: 'Height'
+      },
+      baseDiameter: { 
+        value: getConfigValue('baseDiameter', 0.5), 
+        min: 0.1, max: 3, step: 0.1,
+        label: 'Base Width'
+      },
+      topDiameter: { 
+        value: getConfigValue('topDiameter', 3.0), 
+        min: 0.1, max: 8, step: 0.1,
+        label: 'Top Width'
+      },
+      verticalSpeed: { 
+        value: getConfigValue('verticalSpeed', 1.0), 
+        min: 0, max: 5, step: 0.1,
+        label: 'Vertical Speed'
+      },
+      rotationSpeed: { 
+        value: getConfigValue('rotationSpeed', 1.0), 
+        min: 0, max: 36, step: 3,
+        label: 'Rotation Speed'
+      },
+      vortexStrength: { 
+        value: getConfigValue('vortexStrength', 1.0), 
+        min: 0, max: 5, step: 0.1,
+        label: 'Vortex Strength'
+      },
+      spiralSpin: { 
+        value: getConfigValue('spiralSpin', 2.0), 
+        min: -10, max: 10, step: 0.1,
+        label: 'Spiral Intensity'
+      },
+      heightColorGradient: { 
+        value: getConfigValue('heightColorGradient', false),
+        label: 'Height Color Gradient'
+      }
+    })
+  }), [vfxSettings, allTextureOptions, spritesheetOptions, animationModeOptions, getConfigValue]);
+
+  const [allVfxControls, setAllVfxControls] = useControls('VFX Controls', () => vfxConfig);
+
+  // ✅ ENHANCED: VFX Actions
+  const actionControls = useControls("🚀 VFX Actions", {
+    'Fire Current Settings!': button(() => {
+      console.log('🚀 Triggering VFX with current settings');
+      setIsTimelinePlaying(true);
+      setTimeout(() => setIsTimelinePlaying(false), (vfxSettings.duration || 3.0) * 1000);
+    }),
+    'Debug Values': button(() => {
+      console.log('🔍 Current VFX Values:', {
+        transforms: vfxValues,
+        effects: allVfxControls,
+        context: vfxSettings
+      });
+    })
+  });
+
+  // ✅ PRESETS: Add preset controls
+  const presetNames = useMemo(() => listPresets(), []);
+  const [presetControls, setPresetControls] = useControls('🎛️ Presets', () => ({
+    presetSelection: {
+      value: presetNames[0] || '',
+      options: presetNames
+    },
+    'Apply Preset': button(() => {
+      if (presetControls.presetSelection) {
+        const preset = getPreset(presetControls.presetSelection);
+        if (preset) {
+          updateVfxSettings(preset);
+          setAllVfxControls(preset);
+        }
+      }
+    })
+  }));
+
+  // ✅ UPDATE: Sync VFX controls with context
+  useEffect(() => {
+    const vfxParams = {
+      ...allVfxControls
+    };
+    updateVfxSettings(vfxParams);
+  }, [allVfxControls, updateVfxSettings]);
 
 
   // ✅ PROVEN PATTERN: Generate timeline model from parameter definitions (exact R3F pattern)
@@ -229,21 +445,9 @@ const TimelineController = () => {
   const [isTimelinePlaying, setIsTimelinePlaying] = useState(false);
 
   const handlePlaybackChange = useCallback((playing) => {
-    console.log('🎬 Timeline handlePlaybackChange called:', playing);
     isPlayingRef.current = playing;
     setIsTimelinePlaying(playing);
-    console.log('🎬 isTimelinePlaying set to:', playing);
   }, []);
-
-  // ✅ NEW: Direct VFX trigger function (same as "Fire Current Settings!" button)
-  const triggerVfx = useCallback(() => {
-    console.log('🚀 Timeline triggering VFX directly');
-    setVfxValues(prev => ({ ...prev, trigger: true }));
-    // Auto-reset trigger after brief moment
-    setTimeout(() => {
-      setVfxValues(prev => ({ ...prev, trigger: false }));
-    }, 100);
-  }, [setVfxValues]);
 
   // ✅ PROVEN PATTERN: Handle manual Leva control updates (exact R3F pattern)
   useEffect(() => {
@@ -394,12 +598,14 @@ const TimelineController = () => {
             fadeStrength={1}
           />
 
-          {/* ✅ RESTORED: VfxEngine using shared context + timeline transforms + trigger */}
+          {/* ✅ RESTORED: VfxEngine using shared context + timeline transforms + VFX controls + trigger */}
           <VfxEngine 
             allVfxValues={{
-              // ✅ RESTORED: Use shared VFX settings from context
+              // ✅ VFX Controls: All the particle effect parameters
+              ...allVfxControls,
+              // ✅ RESTORED: Use shared VFX settings from context as fallback
               ...vfxSettings,
-              // Timeline transform overrides
+              // ✅ Transform overrides from timeline
               positionX: vfxValues.positionX,
               positionY: vfxValues.positionY,
               positionZ: vfxValues.positionZ,
@@ -434,7 +640,6 @@ const TimelineController = () => {
         initialModel={timelineModel}
         normalizeFunctions={createNormalizeFunctions}
         parameterMapping={parameterMapping}
-        triggerVfx={triggerVfx}
       />
     </>
   );
