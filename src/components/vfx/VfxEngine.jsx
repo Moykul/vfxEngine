@@ -328,6 +328,7 @@ const VfxEngine = ({
 
   // Handle animation triggers
   useEffect(() => {
+    console.log('🔍 VfxEngine: trigger value received:', effectiveValues.trigger);
     if (effectiveValues.trigger) {
       console.log('🚀 VfxEngine: Animation trigger fired', 
         effectiveValues.useSpritesheet ? '(Spritesheet mode)' : 

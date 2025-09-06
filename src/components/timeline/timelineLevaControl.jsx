@@ -229,9 +229,21 @@ const TimelineController = () => {
   const [isTimelinePlaying, setIsTimelinePlaying] = useState(false);
 
   const handlePlaybackChange = useCallback((playing) => {
+    console.log('🎬 Timeline handlePlaybackChange called:', playing);
     isPlayingRef.current = playing;
     setIsTimelinePlaying(playing);
+    console.log('🎬 isTimelinePlaying set to:', playing);
   }, []);
+
+  // ✅ NEW: Direct VFX trigger function (same as "Fire Current Settings!" button)
+  const triggerVfx = useCallback(() => {
+    console.log('🚀 Timeline triggering VFX directly');
+    setVfxValues(prev => ({ ...prev, trigger: true }));
+    // Auto-reset trigger after brief moment
+    setTimeout(() => {
+      setVfxValues(prev => ({ ...prev, trigger: false }));
+    }, 100);
+  }, [setVfxValues]);
 
   // ✅ PROVEN PATTERN: Handle manual Leva control updates (exact R3F pattern)
   useEffect(() => {
@@ -422,6 +434,7 @@ const TimelineController = () => {
         initialModel={timelineModel}
         normalizeFunctions={createNormalizeFunctions}
         parameterMapping={parameterMapping}
+        triggerVfx={triggerVfx}
       />
     </>
   );
