@@ -304,6 +304,22 @@ const TimelineController = () => {
       setIsTimelinePlaying(true);
       setTimeout(() => setIsTimelinePlaying(false), (vfxSettings.duration || 3.0) * 1000);
     }),
+    'Quick Save Current': button(() => {
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+      const quickSaveData = {
+        vfxSettings: vfxSettings,
+        metadata: {
+          version: "1.0",
+          created: new Date().toISOString(),
+          duration: (vfxSettings.duration || 3.0) * 1000,
+          description: "Quick Save of Current VFX",
+          parameterCount: Object.keys(vfxSettings || {}).length
+        }
+      };
+      
+      fileManager.saveJSON(quickSaveData, `quick-save-${timestamp}.json`);
+      console.log('⚡ Quick save completed');
+    }),
     'Debug Values': button(() => {
       console.log('🔍 Current VFX Values:', {
         transforms: vfxValues,
@@ -421,15 +437,22 @@ const TimelineController = () => {
     return { timelineToLeva, levaToTimeline };
   }, [parameterDefinitions]);
 
-  // ✅ PROVEN PATTERN: Timeline controls (exact R3F pattern)
+  // ✅ ENHANCED: Timeline controls with improved save/load options
   const fileInputRef = useRef();
+  const vfxOnlyFileInputRef = useRef();
   const [{ timelineVisible }, setTimelineVisible] = useControls('Timeline', () => ({
     timelineVisible: { value: true, label: 'Show Timeline' },
     exportAnimation: button(() => {
       const timeline = timelineRef.current && timelineRef.current.getTimeline ? timelineRef.current.getTimeline() : null;
-      if (!timeline) return;
+      if (!timeline) {
+        alert('⚠️ Timeline not ready for export');
+        return;
+      }
       const model = timeline.getModel ? timeline.getModel() : null;
-      if (!model) return;
+      if (!model) {
+        alert('⚠️ No timeline data to export');
+        return;
+      }
       
       // ✅ COMBINED: Export both VFX settings and timeline data
       const combinedData = {
@@ -439,14 +462,80 @@ const TimelineController = () => {
           version: "1.0",
           created: new Date().toISOString(),
           duration: (vfxSettings.duration || 3.0) * 1000,
-          description: "VFX Animation with Timeline"
+          description: "VFX Animation with Timeline",
+          parameterCount: Object.keys(vfxSettings || {}).length,
+          timelineKeyframes: model.rows ? model.rows.length : 0
         }
       };
       
       fileManager.saveJSON(combinedData, 'vfx-animation-complete.json');
+      console.log('💾 Complete animation saved:', combinedData.metadata);
     }),
     importAnimation: button(() => {
       if (fileInputRef.current) fileInputRef.current.click();
+    })
+  }));
+
+  // ✅ NEW: Enhanced file operations with multiple save options
+  const fileOperations = useControls('💾 Save/Load', () => ({
+    'Save Complete Setup': button(() => {
+      const timeline = timelineRef.current?.getTimeline?.();
+      const model = timeline?.getModel?.();
+      
+      const completeData = {
+        vfxSettings: vfxSettings,
+        timeline: model || null,
+        metadata: {
+          version: "1.0",
+          created: new Date().toISOString(),
+          duration: (vfxSettings.duration || 3.0) * 1000,
+          description: "Complete VFX Setup",
+          hasTimeline: !!model,
+          parameterCount: Object.keys(vfxSettings || {}).length
+        }
+      };
+      
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+      fileManager.saveJSON(completeData, `vfx-complete-${timestamp}.json`);
+      console.log('💾 Complete setup saved with timestamp');
+    }),
+    'Save VFX Only': button(() => {
+      const vfxOnlyData = {
+        vfxSettings: vfxSettings,
+        metadata: {
+          version: "1.0",
+          created: new Date().toISOString(),
+          duration: (vfxSettings.duration || 3.0) * 1000,
+          description: "VFX Settings Only",
+          parameterCount: Object.keys(vfxSettings || {}).length
+        }
+      };
+      
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+      fileManager.saveJSON(vfxOnlyData, `vfx-settings-${timestamp}.json`);
+      console.log('💾 VFX-only settings saved');
+    }),
+    'Load Complete Setup': button(() => {
+      if (fileInputRef.current) fileInputRef.current.click();
+    }),
+    'Load VFX Only': button(() => {
+      if (vfxOnlyFileInputRef.current) vfxOnlyFileInputRef.current.click();
+    }),
+    'Save Current as Preset': button(() => {
+      const presetName = prompt('Enter preset name:');
+      if (!presetName) return;
+      
+      const presetData = {
+        name: presetName,
+        settings: vfxSettings,
+        metadata: {
+          created: new Date().toISOString(),
+          description: `Custom preset: ${presetName}`
+        }
+      };
+      
+      fileManager.saveJSON(presetData, `preset-${presetName.toLowerCase().replace(/\s+/g, '-')}.json`);
+      console.log('🎛️ Preset saved:', presetName);
     })
   }));
 
@@ -510,45 +599,177 @@ const TimelineController = () => {
     }
   }, [vfxValues, currentTime, parameterDefinitions]);
 
-  // ✅ COMBINED: File import for both VFX settings and timeline data
+  // ✅ ENHANCED: File import for both complete setups and VFX-only files
   const handleImport = (e) => {
     const file = e.target.files[0];
     if (!file) return;
     
+    console.log('🔄 Starting file import process...');
+    console.log('📁 File details:', {
+      name: file.name,
+      size: `${(file.size / 1024).toFixed(1)} KB`,
+      type: file.type,
+      lastModified: new Date(file.lastModified).toISOString()
+    });
+    
     fileManager.loadJSON(file, (data) => {
       const timeline = timelineRef.current && timelineRef.current.getTimeline ? timelineRef.current.getTimeline() : null;
       
-      // Check if it's the new combined format
+      console.log('📁 Loading file:', file.name);
+      console.log('📁 Raw data received:', data);
+      console.log('📁 Data structure keys:', Object.keys(data));
+      console.log('📁 VFX Settings present:', !!data.vfxSettings);
+      console.log('📁 Timeline present:', !!data.timeline);
+      console.log('📁 Metadata present:', !!data.metadata);
+      
+      // Check file format and handle appropriately
       if (data.vfxSettings && data.timeline) {
-        console.log('📁 Loading combined VFX animation file');
+        console.log('📁 Processing complete VFX animation file...');
+        console.log('📁 VFX Settings keys:', Object.keys(data.vfxSettings));
+        console.log('📁 VFX Settings sample:', {
+          pCount: data.vfxSettings.pCount,
+          shape: data.vfxSettings.shape,
+          particleTexture: data.vfxSettings.particleTexture,
+          useSpritesheet: data.vfxSettings.useSpritesheet
+        });
         
         // Update VFX settings first
         if (updateVfxSettings) {
+          console.log('🔄 Applying VFX settings to context...');
           updateVfxSettings(data.vfxSettings);
-          console.log('✅ VFX settings restored');
+          console.log('✅ VFX settings restored:', Object.keys(data.vfxSettings).length, 'parameters');
+        } else {
+          console.error('❌ updateVfxSettings function not available!');
         }
         
         // Update timeline data
-        if (timeline && timeline.setModel) {
+        if (timeline && timeline.setModel && data.timeline) {
+          console.log('🔄 Applying timeline data...');
           timeline.setModel(data.timeline);
           console.log('✅ Timeline data restored');
+        } else {
+          console.warn('⚠️ Timeline not available or no timeline data');
         }
         
-        console.log('🎬 Combined animation loaded successfully');
-      } 
-      // Legacy format - just timeline data
-      else if (data.rows) {
-        console.log('📁 Loading legacy timeline file');
+        alert(`✅ Complete animation loaded successfully!\n• VFX Parameters: ${Object.keys(data.vfxSettings).length}\n• Timeline: ${data.timeline ? 'Yes' : 'No'}\n• File: ${file.name}`);
+        
+      } else if (data.vfxSettings && !data.timeline) {
+        console.log('📁 Processing VFX-only settings file...');
+        console.log('📁 VFX Settings keys:', Object.keys(data.vfxSettings));
+        
+        if (updateVfxSettings) {
+          console.log('🔄 Applying VFX-only settings...');
+          updateVfxSettings(data.vfxSettings);
+          console.log('✅ VFX-only settings restored:', Object.keys(data.vfxSettings).length, 'parameters');
+        }
+        
+        alert(`✅ VFX settings loaded successfully!\n• Parameters: ${Object.keys(data.vfxSettings).length}\n• File: ${file.name}`);
+        
+      } else if (data.rows) {
+        console.log('📁 Processing legacy timeline file...');
         if (timeline && timeline.setModel) {
           timeline.setModel(data);
+          console.log('✅ Legacy timeline data restored');
         }
+        alert(`✅ Legacy timeline data loaded!\n• File: ${file.name}`);
+        
+      } else if (data.settings) {
+        console.log('📁 Processing preset file...');
+        if (updateVfxSettings && data.settings) {
+          updateVfxSettings(data.settings);
+          console.log('✅ Preset applied:', data.name || 'Unknown');
+        }
+        alert(`✅ Preset "${data.name || 'Custom'}" applied successfully!\n• File: ${file.name}`);
+        
+      } else {
+        console.warn('⚠️ Unknown file format detected!');
+        console.log('📁 Available data keys:', Object.keys(data));
+        console.log('📁 Full data structure:', data);
+        alert(`⚠️ Unknown file format in ${file.name}. Please check the file structure.\n\nExpected: vfxSettings, timeline, settings, or rows`);
+        return;
       }
-      // Unknown format
-      else {
-        console.warn('⚠️ Unknown file format');
-        alert('Invalid animation file format');
+      
+      // Trigger a brief animation to show the loaded effect
+      console.log('🎬 Triggering preview animation...');
+      setTimeout(() => {
+        setIsTimelinePlaying(true);
+        setTimeout(() => setIsTimelinePlaying(false), 500);
+      }, 100);
+    });
+    
+    // Reset file input
+    e.target.value = '';
+  };
+
+  // ✅ ENHANCED: VFX-only import handler with detailed debugging
+  const handleVfxOnlyImport = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    console.log('🔄 Starting VFX-only import process...');
+    console.log('📁 File details:', {
+      name: file.name,
+      size: `${(file.size / 1024).toFixed(1)} KB`,
+      type: file.type
+    });
+    
+    fileManager.loadJSON(file, (data) => {
+      console.log('📁 VFX-only import - raw data:', data);
+      console.log('📁 Available keys:', Object.keys(data));
+      
+      let settingsToApply = null;
+      
+      if (data.vfxSettings) {
+        console.log('📁 Found vfxSettings in data');
+        settingsToApply = data.vfxSettings;
+      } else if (data.settings) {
+        console.log('📁 Found settings in data (preset format)');
+        settingsToApply = data.settings;
+      } else {
+        console.error('❌ No VFX settings found in file!');
+        console.log('📁 Data structure:', data);
+        alert(`⚠️ This file does not contain VFX settings.\n\nFile: ${file.name}\nFound keys: ${Object.keys(data).join(', ')}`);
+        return;
+      }
+      
+      console.log('📁 Settings to apply:', {
+        parameterCount: Object.keys(settingsToApply).length,
+        sampleSettings: {
+          pCount: settingsToApply.pCount,
+          shape: settingsToApply.shape,
+          particleTexture: settingsToApply.particleTexture
+        }
+      });
+      
+      if (updateVfxSettings && settingsToApply) {
+        console.log('🔄 Applying VFX settings to context...');
+        updateVfxSettings(settingsToApply);
+        console.log('✅ VFX settings applied:', Object.keys(settingsToApply).length, 'parameters');
+        
+        // Verify the update worked
+        setTimeout(() => {
+          console.log('🔍 Verification - Current vfxSettings after update:', vfxSettings);
+        }, 100);
+        
+        alert(`✅ VFX settings loaded!\n• Parameters: ${Object.keys(settingsToApply).length}\n• File: ${file.name}`);
+        
+        // Trigger a brief animation to show the loaded effect
+        setTimeout(() => {
+          console.log('🎬 Triggering preview animation...');
+          setIsTimelinePlaying(true);
+          setTimeout(() => setIsTimelinePlaying(false), 500);
+        }, 100);
+      } else {
+        console.error('❌ Failed to apply settings!', {
+          updateVfxSettings: !!updateVfxSettings,
+          settingsToApply: !!settingsToApply
+        });
+        alert('❌ Failed to apply VFX settings. Check console for details.');
       }
     });
+    
+    // Reset file input
+    e.target.value = '';
   };
 
   // Canvas styles
@@ -576,6 +797,14 @@ const TimelineController = () => {
         accept="application/json"
         style={{ display: 'none' }}
         onChange={handleImport}
+      />
+      
+      <input
+        ref={vfxOnlyFileInputRef}
+        type="file"
+        accept="application/json"
+        style={{ display: 'none' }}
+        onChange={handleVfxOnlyImport}
       />
       
       <Canvas
