@@ -181,6 +181,54 @@ const VfxEngine = ({
       tornadoEnabled, tornadoHeight, verticalSpeed, rotationSpeed, vortexStrength,
       spiralSpin, baseDiameter, topDiameter, heightColorGradient]);
 
+  // ✅ NEW: Animation preset function that matches UI options
+  const applyAnimationPreset = (progress, mesh) => {
+    if (!mesh || !effectiveValues.animationPreset || effectiveValues.animationPreset === 'none') return;
+    
+    const presetProgress = Math.min(progress, 1);
+    const basePosition = [
+      effectiveValues.positionX || 0,
+      effectiveValues.positionY || 0, 
+      effectiveValues.positionZ || 0
+    ];
+    const baseScale = effectiveValues.scale || 1;
+    
+    switch (effectiveValues.animationPreset) {
+      case 'fadeIn':
+        // Gradual fade in with scale
+        const fadeInScale = baseScale * Math.min(presetProgress * 2, 1);
+        mesh.scale.set(fadeInScale, fadeInScale, fadeInScale);
+        break;
+        
+      case 'fadeOut':
+        // Gradual fade out with scale
+        const fadeOutScale = baseScale * Math.max(1 - presetProgress, 0.1);
+        mesh.scale.set(fadeOutScale, fadeOutScale, fadeOutScale);
+        break;
+        
+      case 'spiral':
+        // Spiral rotation with upward movement
+        const spiralRadians = presetProgress * Math.PI * 4; // 2 full rotations
+        mesh.rotation.y = spiralRadians;
+        mesh.position.y = basePosition[1] + presetProgress * 2;
+        break;
+        
+      case 'burst':
+        // Quick scale burst at the beginning
+        const burstScale = presetProgress < 0.3 ? 
+          baseScale * (1 + Math.sin(presetProgress * Math.PI * 10) * 0.5) : 
+          baseScale;
+        mesh.scale.set(burstScale, burstScale, burstScale);
+        break;
+        
+      case 'gravity':
+        // Simulated gravity fall
+        const gravityY = basePosition[1] - (presetProgress * presetProgress * 3);
+        mesh.position.y = gravityY;
+        break;
+    }
+  };
+
   // ✅ CORRECTED: Fallback geometry with aHeightFactor
   const createFallbackGeometry = useMemo(() => {
     return () => {
@@ -419,6 +467,11 @@ const VfxEngine = ({
 
       materialRef.current.uniforms.uProgress.value = progress;
       materialRef.current.uniforms.uTime.value = elapsedTime;
+
+      // ✅ NEW: Apply animation preset to mesh continuously during animation
+      if (meshRef.current && progress > 0) {
+        applyAnimationPreset(progress, meshRef.current);
+      }
 
       // Complete animation
       if (progress >= 1) {
