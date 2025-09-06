@@ -9,16 +9,16 @@ const DEBUG = false;
 
 const App = () => {
   // ✅ MODE SWITCHER: Choose between VFX-only or Timeline mode
-  const modeControls = useControls('🎛️ Mode Selection', {
-    mode: {
-      value: 'vfx',
-      options: {
-        'VFX Only': 'vfx',
-        'Timeline + VFX': 'timeline'
-      },
-      label: 'Control Mode'
-    }
-  });
+  // const modeControls = useControls('🎛️ Mode Selection', {
+    // mode: {
+    //   value: 'timeline',
+    //   // options: {
+    //   //   'VFX Only': 'vfx',
+    //   //   'Timeline + VFX': 'timeline'
+    //   // },
+    //   label: 'Control Mode'
+    // }
+  // });
 
   // Canvas styles
   useEffect(() => {
@@ -40,12 +40,8 @@ const App = () => {
   // ✅ CONDITIONAL RENDERING: Switch between components based on mode
   return (
     <VfxSettingsProvider>
-      <div style={{ display: modeControls.mode === 'vfx' ? 'block' : 'none' }}>
-        <VfxLevaControls />
-      </div>
-      <div style={{ display: modeControls.mode === 'timeline' ? 'block' : 'none' }}>
         <TimelineController />
-      </div>
+        <VfxLevaControls />
     </VfxSettingsProvider>
   );
 };

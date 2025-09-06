@@ -7,6 +7,8 @@ import AnimationTimeline from './AnimationTimeline';
 import VfxEngine from '../vfx/VfxEngine.jsx';
 import fileManager from './fileManager';
 import { useVfxSettings } from '../../contexts/VfxSettingsContext.jsx';
+import { useVfxSprites } from '../../hooks/index.js';
+import { useVfxSpritesheets } from '../../hooks/useVfxSpritesheets.js';
 
 // Debug flag
 const DEBUG = false;
@@ -14,6 +16,11 @@ const DEBUG = false;
 const TimelineController = () => {
   // ✅ RESTORED: Read VFX settings from shared context
   const { vfxSettings, updateVfxSettings } = useVfxSettings();
+  
+  // ✅ FIXED: Add sprite hooks to match VfxLevaControls
+  const { sprites, spriteCategories } = useVfxSprites();
+  const { spritesheets, spritesheetOptions, animationModeOptions, getSpritesheetMetadata } = useVfxSpritesheets();
+  
   // ✅ PROVEN PATTERN: Enhanced parameter definitions with organized grouping (from R3F reference)
   const parameterDefinitions = useMemo(() => ({
     // Transform parameters - following exact R3F pattern
@@ -391,6 +398,10 @@ const TimelineController = () => {
               opacity: vfxValues.opacity,
               // ✅ RESTORED: Trigger VFX animation when timeline plays
               trigger: isTimelinePlaying
+            }}
+            sprites={sprites}
+            onComplete={() => {
+              setIsTimelinePlaying(false);
             }}
           />
           
