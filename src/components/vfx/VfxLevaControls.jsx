@@ -36,7 +36,12 @@ const VfxLevaControls = () => {
   
   // Load all available textures and spritesheets
   const { sprites, spriteCategories } = useVfxSprites();
-  const { spritesheets, spritesheetOptions, animationModeOptions, getSpritesheetMetadata } = useVfxSpritesheets();
+  const { spritesheets, spritesheetOptions, animationModeOptions, getSpritesheetMetadata, isLoading } = useVfxSpritesheets();
+
+  // ✅ FORCE LEVA REMOUNT: Key changes when spritesheets load, forcing complete regeneration
+  const levaKey = useMemo(() => {
+    return `leva-${Object.keys(spritesheetOptions).length}-${Date.now()}`;
+  }, [spritesheetOptions]);
 
   // ✅ ENHANCED: Combined texture options (basic + extended)
   const allTextureOptions = useMemo(() => {
@@ -221,7 +226,7 @@ const VfxLevaControls = () => {
     })
   }), [vfxSettings, allTextureOptions, spritesheetOptions, animationModeOptions, getConfigValue]);
 
-  const [allVfxControls, setAllVfxControls] = useControls('VFX Controls', () => levaConfig);
+  const [allVfxControls, setAllVfxControls] = useControls('VFX Controls', () => levaConfig, { key: levaKey });
 
   // ✅ SYNC: When shared context changes (from other modes), update local state
   useEffect(() => {
@@ -289,24 +294,6 @@ const VfxLevaControls = () => {
       }
     }
   }, [vfxSettings, setAllVfxControls]);
-
-  // ✅ FORCE UPDATE: When spritesheetOptions becomes populated, force Leva to refresh
-  useEffect(() => {
-    const hasSpritesheetOptions = Object.keys(spritesheetOptions).length > 0;
-    if (hasSpritesheetOptions) {
-      console.log('🔄 Spritesheet options populated, forcing Leva update');
-      // Force regeneration by updating the config - but safely
-      try {
-        // Don't pass empty object, instead trigger a re-render by updating with current values
-        const currentValues = { ...allVfxControls };
-        if (Object.keys(currentValues).length > 0) {
-          setAllVfxControls(currentValues);
-        }
-      } catch (error) {
-        console.warn('🔄 Failed to update spritesheet options:', error);
-      }
-    }
-  }, [spritesheetOptions, allVfxControls, setAllVfxControls]);
 
   // ✅ ENHANCED: Local values for VfxEngine (includes spritesheet data)
   const allVfxValues = useMemo(() => ({

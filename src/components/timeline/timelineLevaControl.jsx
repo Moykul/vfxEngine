@@ -21,7 +21,12 @@ const TimelineController = () => {
   
   // ✅ FIXED: Add sprite hooks to match VfxLevaControls
   const { sprites, spriteCategories } = useVfxSprites();
-  const { spritesheets, spritesheetOptions, animationModeOptions, getSpritesheetMetadata } = useVfxSpritesheets();
+  const { spritesheets, spritesheetOptions, animationModeOptions, getSpritesheetMetadata, isLoading } = useVfxSpritesheets();
+  
+  // ✅ FORCE LEVA REMOUNT: Key changes when spritesheets load, forcing complete regeneration
+  const levaKey = useMemo(() => {
+    return `leva-${Object.keys(spritesheetOptions).length}-${Date.now()}`;
+  }, [spritesheetOptions]);
   
   // ✅ HELPER: Get value from context with fallback to defaults
   const getConfigValue = useCallback((key, defaultValue) => {
@@ -296,7 +301,7 @@ const TimelineController = () => {
     })
   }), [vfxSettings, allTextureOptions, spritesheetOptions, animationModeOptions, getConfigValue]);
 
-  const [allVfxControls, setAllVfxControls] = useControls('VFX Controls', () => vfxConfig);
+  const [allVfxControls, setAllVfxControls] = useControls('VFX Controls', () => vfxConfig, { key: levaKey });
 
   // ✅ EARLY DECLARATION: Timeline playing state for VFX trigger
   const [isTimelinePlaying, setIsTimelinePlaying] = useState(false);
