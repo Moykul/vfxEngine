@@ -179,6 +179,7 @@ const TimelineController = () => {
       color: { value: getConfigValue('color', '#ff6030') },
       colorEnd: { value: getConfigValue('colorEnd', '#ff0030') },
       useGradient: { value: getConfigValue('useGradient', false) },
+      opacity: { value: getConfigValue('opacity', 1.0), min: 0.0, max: 1.0, step: 0.1 },
       blendMode: { 
         value: getConfigValue('blendMode', 0),
         options: { 'Additive': 0, 'Normal': 1, 'Multiply': 2, 'Subtractive': 3 }
@@ -297,35 +298,60 @@ const TimelineController = () => {
 
   const [allVfxControls, setAllVfxControls] = useControls('VFX Controls', () => vfxConfig);
 
+  // ✅ EARLY DECLARATION: Timeline playing state for VFX trigger
+  const [isTimelinePlaying, setIsTimelinePlaying] = useState(false);
+
   // ✅ ENHANCED: VFX Actions
   const actionControls = useControls("🚀 VFX Actions", {
     'Fire Current Settings!': button(() => {
       console.log('🚀 Triggering VFX with current settings');
       setIsTimelinePlaying(true);
       setTimeout(() => setIsTimelinePlaying(false), (vfxSettings.duration || 3.0) * 1000);
-    }),
-    'Quick Save Current': button(() => {
-      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-      const quickSaveData = {
-        vfxSettings: vfxSettings,
-        metadata: {
-          version: "1.0",
-          created: new Date().toISOString(),
-          duration: (vfxSettings.duration || 3.0) * 1000,
-          description: "Quick Save of Current VFX",
-          parameterCount: Object.keys(vfxSettings || {}).length
-        }
-      };
+    // }),
+    // 'Quick Save Current': button(() => {
+    //   const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+    //   const quickSaveData = {
+    //     vfxSettings: vfxSettings,
+    //     metadata: {
+    //       version: "1.0",
+    //       created: new Date().toISOString(),
+    //       duration: (vfxSettings.duration || 3.0) * 1000,
+    //       description: "Quick Save of Current VFX",
+    //       parameterCount: Object.keys(vfxSettings || {}).length
+    //     }
+    //   };
       
-      fileManager.saveJSON(quickSaveData, `quick-save-${timestamp}.json`);
-      console.log('⚡ Quick save completed');
-    }),
-    'Debug Values': button(() => {
-      console.log('🔍 Current VFX Values:', {
-        transforms: vfxValues,
-        effects: allVfxControls,
-        context: vfxSettings
-      });
+    //   fileManager.saveJSON(quickSaveData, `quick-save-${timestamp}.json`);
+    //   console.log('⚡ Quick save completed');
+    // }),
+    // 'Debug Values': button(() => {
+    //   console.log('🔍 Current VFX Values:', {
+    //     transforms: vfxValues,
+    //     effects: allVfxControls,
+    //     context: vfxSettings
+    //   });
+    // }),
+    // 'Test Preset System': button(() => {
+    //   console.log('🎛️ Testing preset system...');
+    //   console.log('🎛️ Available presets:', listPresets());
+    //   console.log('🎛️ Current selection:', presetControls?.presetSelection);
+      
+    //   const testPreset = getPreset('Magic Sparkle');
+    //   console.log('🎛️ Test preset (Magic Sparkle):', testPreset);
+      
+    //   if (testPreset) {
+    //     console.log('🎛️ Manually applying test preset...');
+    //     updateVfxSettings(testPreset);
+        
+    //     const filtered = {};
+    //     Object.keys(testPreset).forEach(key => {
+    //       if (!['positionX', 'positionY', 'positionZ', 'rotationX', 'rotationY', 'rotationZ', 'scale', 'trigger'].includes(key)) {
+    //         filtered[key] = testPreset[key];
+    //       }
+    //     });
+    //     setAllVfxControls(filtered);
+    //     console.log('✅ Test preset applied');
+    //   }
     })
   });
 
@@ -335,44 +361,116 @@ const TimelineController = () => {
     console.log('🎛️ Available presets:', names);
     return names;
   }, []);
+  
+  // ✅ FIXED: Convert array to object for Leva options
+  const presetOptions = useMemo(() => {
+    const options = {};
+    presetNames.forEach(name => {
+      options[name] = name;
+    });
+    return options;
+  }, [presetNames]);
+  
   const [presetControls, setPresetControls] = useControls('🎛️ Presets', () => ({
     presetSelection: {
       value: presetNames[0] || '',
-      options: presetNames
+      options: presetOptions
     },
     'Apply Preset': button(() => {
-      // This will trigger the useEffect below when the button is clicked
-      // We can't access presetControls.presetSelection here yet
-      console.log('🎛️ Apply Preset button clicked, current selection:', presetControls.presetSelection);
+      const selectedName = presetControls.presetSelection;
+      console.log('🎛️ Apply Preset button clicked, current selection:', selectedName);
+      
+      if (!selectedName) {
+        alert('Please select a preset first!');
+        return;
+      }
+      
+      const preset = getPreset(selectedName);
+      if (preset) {
+        console.log('🎛️ Manually applying preset:', selectedName);
+        
+        // Update shared context
+        updateVfxSettings(preset);
+        
+        // Filter and apply to Leva controls
+        const filteredPreset = {};
+        const excludedKeys = ['positionX', 'positionY', 'positionZ', 'rotationX', 'rotationY', 'rotationZ', 'scale', 'trigger'];
+        
+        Object.keys(preset).forEach(key => {
+          if (!excludedKeys.includes(key)) {
+            filteredPreset[key] = preset[key];
+          }
+        });
+        
+        try {
+          setAllVfxControls(filteredPreset);
+          console.log('✅ Manual preset application successful');
+          
+          // Trigger animation
+          setTimeout(() => {
+            setIsTimelinePlaying(true);
+            setTimeout(() => setIsTimelinePlaying(false), 1500);
+          }, 100);
+          
+        } catch (error) {
+          console.error('❌ Failed to apply preset manually:', error);
+          alert('Failed to apply preset. Check console for details.');
+        }
+      } else {
+        alert('Preset not found: ' + selectedName);
+      }
     })
   }));
 
   // ✅ FIXED: Apply preset when selection changes OR when button is clicked
   useEffect(() => {
     const selectedName = presetControls.presetSelection;
-    if (!selectedName) return;
+    if (!selectedName) {
+      console.log('🎛️ No preset selected');
+      return;
+    }
     
     const preset = getPreset(selectedName);
     if (preset) {
       console.log('🎛️ Applying preset:', selectedName);
-      // Update shared context
+      console.log('🎛️ Preset data:', preset);
+      
+      // Update shared context first
       updateVfxSettings(preset);
+      
       // Update local Leva controls
       try {
         // Filter preset to only include keys that exist in current controls
         const filteredPreset = {};
+        const excludedTransformKeys = ['positionX', 'positionY', 'positionZ', 'rotationX', 'rotationY', 'rotationZ', 'scale', 'trigger'];
+        
         Object.keys(preset).forEach(key => {
-          // Only include VFX parameters, not transform parameters
-          if (!['positionX', 'positionY', 'positionZ', 'rotationX', 'rotationY', 'rotationZ', 'scale', 'opacity'].includes(key)) {
+          // Only include VFX parameters, not transform parameters or trigger
+          if (!excludedTransformKeys.includes(key)) {
             filteredPreset[key] = preset[key];
           }
         });
+        
+        console.log('🎛️ Filtered preset for Leva controls:', filteredPreset);
+        console.log('🎛️ Properties to apply:', Object.keys(filteredPreset));
+        
         setAllVfxControls(filteredPreset);
+        console.log('✅ Preset applied successfully');
+        
+        // Trigger a brief VFX animation to show the preset effect
+        setTimeout(() => {
+          setIsTimelinePlaying(true);
+          setTimeout(() => setIsTimelinePlaying(false), 1000);
+        }, 200);
+        
       } catch (error) {
         console.warn('⚠️ Could not apply all preset values to Leva controls:', error);
+        console.warn('⚠️ Error details:', error.message);
       }
+    } else {
+      console.warn('🎛️ Preset not found:', selectedName);
     }
-  }, [presetControls.presetSelection, updateVfxSettings, setAllVfxControls]);
+  }, [presetControls.presetSelection, updateVfxSettings, setAllVfxControls, setIsTimelinePlaying]);
 
   // ✅ UPDATE: Sync VFX controls with context
   useEffect(() => {
@@ -525,17 +623,28 @@ const TimelineController = () => {
       const presetName = prompt('Enter preset name:');
       if (!presetName) return;
       
+      // Get timeline data if available
+      const timeline = timelineRef.current?.getTimeline?.();
+      const timelineModel = timeline?.getModel?.();
+      
       const presetData = {
         name: presetName,
         settings: vfxSettings,
+        timeline: timelineModel || null,
         metadata: {
           created: new Date().toISOString(),
-          description: `Custom preset: ${presetName}`
+          description: `Custom preset with animation: ${presetName}`,
+          hasTimeline: !!timelineModel,
+          timelineKeyframes: timelineModel?.rows ? timelineModel.rows.reduce((count, row) => count + (row.keyframes?.length || 0), 0) : 0
         }
       };
       
       fileManager.saveJSON(presetData, `preset-${presetName.toLowerCase().replace(/\s+/g, '-')}.json`);
-      console.log('🎛️ Preset saved:', presetName);
+      console.log('🎛️ Preset saved with timeline:', presetName, {
+        vfxSettings: !!presetData.settings,
+        timeline: !!presetData.timeline,
+        keyframes: presetData.metadata.timelineKeyframes
+      });
     })
   }));
 
@@ -568,9 +677,7 @@ const TimelineController = () => {
     }
   }, [setVfxValues, parameterMapping]);
 
-  // ✅ RESTORED: Track timeline playing state for VFX trigger
-  const [isTimelinePlaying, setIsTimelinePlaying] = useState(false);
-
+  // ✅ RESTORED: handlePlaybackChange callback
   const handlePlaybackChange = useCallback((playing) => {
     isPlayingRef.current = playing;
     setIsTimelinePlaying(playing);
