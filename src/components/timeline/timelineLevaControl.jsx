@@ -23,9 +23,9 @@ const TimelineController = () => {
   const { sprites, spriteCategories } = useVfxSprites();
   const { spritesheets, spritesheetOptions, animationModeOptions, getSpritesheetMetadata, isLoading } = useVfxSpritesheets();
   
-  // ✅ FORCE LEVA REMOUNT: Key changes when spritesheets load, forcing complete regeneration
+  // ✅ STABLE LEVA KEY: Only changes when spritesheets actually change, not on every render
   const levaKey = useMemo(() => {
-    return `leva-${Object.keys(spritesheetOptions).length}-${Date.now()}`;
+    return `leva-${Object.keys(spritesheetOptions).length}`;
   }, [spritesheetOptions]);
   
   // ✅ HELPER: Get value from context with fallback to defaults
@@ -299,7 +299,7 @@ const TimelineController = () => {
         label: 'Height Color Gradient'
       }
     })
-  }), [vfxSettings, allTextureOptions, spritesheetOptions, animationModeOptions, getConfigValue]);
+  }), [allTextureOptions, spritesheetOptions, animationModeOptions, getConfigValue]);  // removed vfxSettings from dependencies
 
   const [allVfxControls, setAllVfxControls] = useControls('VFX Controls', () => vfxConfig, { key: levaKey });
 
@@ -312,7 +312,7 @@ const TimelineController = () => {
       console.log('🚀 Triggering VFX with current settings');
       setIsTimelinePlaying(true);
       setTimeout(() => setIsTimelinePlaying(false), (vfxSettings.duration || 3.0) * 1000);
-    // }),
+    })
     // 'Quick Save Current': button(() => {
     //   const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
     //   const quickSaveData = {
@@ -357,7 +357,7 @@ const TimelineController = () => {
     //     setAllVfxControls(filtered);
     //     console.log('✅ Test preset applied');
     //   }
-    })
+    // })
   });
 
   // ✅ PRESETS: Add preset controls - FIXED logic issue
@@ -543,113 +543,90 @@ const TimelineController = () => {
   // ✅ ENHANCED: Timeline controls with improved save/load options
   const fileInputRef = useRef();
   const vfxOnlyFileInputRef = useRef();
+  const presetFileInputRef = useRef();
   const [{ timelineVisible }, setTimelineVisible] = useControls('Timeline', () => ({
     timelineVisible: { value: true, label: 'Show Timeline' },
-    exportAnimation: button(() => {
-      const timeline = timelineRef.current && timelineRef.current.getTimeline ? timelineRef.current.getTimeline() : null;
-      if (!timeline) {
-        alert('⚠️ Timeline not ready for export');
-        return;
-      }
-      const model = timeline.getModel ? timeline.getModel() : null;
-      if (!model) {
-        alert('⚠️ No timeline data to export');
-        return;
-      }
+    // exportAnimation: button(() => {
+    //   const timeline = timelineRef.current && timelineRef.current.getTimeline ? timelineRef.current.getTimeline() : null;
+    //   if (!timeline) {
+    //     alert('⚠️ Timeline not ready for export');
+    //     return;
+    //   }
+    //   const model = timeline.getModel ? timeline.getModel() : null;
+    //   if (!model) {
+    //     alert('⚠️ No timeline data to export');
+    //     return;
+    //   }
       
-      // ✅ COMBINED: Export both VFX settings and timeline data
-      const combinedData = {
-        vfxSettings: vfxSettings,
-        timeline: model,
-        metadata: {
-          version: "1.0",
-          created: new Date().toISOString(),
-          duration: (vfxSettings.duration || 3.0) * 1000,
-          description: "VFX Animation with Timeline",
-          parameterCount: Object.keys(vfxSettings || {}).length,
-          timelineKeyframes: model.rows ? model.rows.length : 0
-        }
-      };
+    //   // ✅ COMBINED: Export both VFX settings and timeline data
+    //   const combinedData = {
+    //     vfxSettings: vfxSettings,
+    //     timeline: model,
+    //     metadata: {
+    //       version: "1.0",
+    //       created: new Date().toISOString(),
+    //       duration: (vfxSettings.duration || 3.0) * 1000,
+    //       description: "VFX Animation with Timeline",
+    //       parameterCount: Object.keys(vfxSettings || {}).length,
+    //       timelineKeyframes: model.rows ? model.rows.length : 0
+    //     }
+    //   };
       
-      fileManager.saveJSON(combinedData, 'vfx-animation-complete.json');
-      console.log('💾 Complete animation saved:', combinedData.metadata);
-    }),
-    importAnimation: button(() => {
-      if (fileInputRef.current) fileInputRef.current.click();
-    })
+    //   fileManager.saveJSON(combinedData, 'vfx-animation-complete.json');
+    //   console.log('💾 Complete animation saved:', combinedData.metadata);
+    // }),
+    // importAnimation: button(() => {
+    //   if (fileInputRef.current) fileInputRef.current.click();
+    // })
   }));
 
-  // ✅ NEW: Enhanced file operations with multiple save options
+  // Store current values in refs for access from save function
+  const currentVfxControlsRef = useRef(allVfxControls);
+  const currentVfxValuesRef = useRef(vfxValues);
+  
+  // Update refs when values change
+  useEffect(() => {
+    currentVfxControlsRef.current = allVfxControls;
+  }, [allVfxControls]);
+  
+  useEffect(() => {
+    currentVfxValuesRef.current = vfxValues;
+  }, [vfxValues]);
+
+  // Save function that accesses current values via refs
+  const saveCurrentAsPreset = useCallback(() => {
+    const presetName = prompt('Enter preset name:');
+    if (!presetName) return;
+    
+    const timeline = timelineRef.current?.getTimeline?.();
+    const timelineModel = timeline?.getModel?.();
+    
+    const currentCompleteSettings = {
+      ...currentVfxControlsRef.current,
+      ...currentVfxValuesRef.current
+    };
+    
+    const presetData = {
+      name: presetName,
+      settings: currentCompleteSettings,
+      timeline: timelineModel || null,
+      metadata: {
+        created: new Date().toISOString(),
+        description: `Custom preset with animation: ${presetName}`,
+        hasTimeline: !!timelineModel,
+        timelineKeyframes: timelineModel?.rows ? timelineModel.rows.reduce((count, row) => count + (row.keyframes?.length || 0), 0) : 0,
+        parameterCount: Object.keys(currentCompleteSettings).length
+      }
+    };
+    
+    fileManager.saveJSON(presetData, `preset-${presetName.toLowerCase().replace(/\s+/g, '-')}.json`);
+  }, []);
+
+  // File operations controls
   const fileOperations = useControls('💾 Save/Load', () => ({
-    'Save Complete Setup': button(() => {
-      const timeline = timelineRef.current?.getTimeline?.();
-      const model = timeline?.getModel?.();
-      
-      const completeData = {
-        vfxSettings: vfxSettings,
-        timeline: model || null,
-        metadata: {
-          version: "1.0",
-          created: new Date().toISOString(),
-          duration: (vfxSettings.duration || 3.0) * 1000,
-          description: "Complete VFX Setup",
-          hasTimeline: !!model,
-          parameterCount: Object.keys(vfxSettings || {}).length
-        }
-      };
-      
-      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-      fileManager.saveJSON(completeData, `vfx-complete-${timestamp}.json`);
-      console.log('💾 Complete setup saved with timestamp');
-    }),
-    'Save VFX Only': button(() => {
-      const vfxOnlyData = {
-        vfxSettings: vfxSettings,
-        metadata: {
-          version: "1.0",
-          created: new Date().toISOString(),
-          duration: (vfxSettings.duration || 3.0) * 1000,
-          description: "VFX Settings Only",
-          parameterCount: Object.keys(vfxSettings || {}).length
-        }
-      };
-      
-      const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-      fileManager.saveJSON(vfxOnlyData, `vfx-settings-${timestamp}.json`);
-      console.log('💾 VFX-only settings saved');
-    }),
-    'Load Complete Setup': button(() => {
-      if (fileInputRef.current) fileInputRef.current.click();
-    }),
-    'Load VFX Only': button(() => {
-      if (vfxOnlyFileInputRef.current) vfxOnlyFileInputRef.current.click();
-    }),
-    'Save Current as Preset': button(() => {
-      const presetName = prompt('Enter preset name:');
-      if (!presetName) return;
-      
-      // Get timeline data if available
-      const timeline = timelineRef.current?.getTimeline?.();
-      const timelineModel = timeline?.getModel?.();
-      
-      const presetData = {
-        name: presetName,
-        settings: vfxSettings,
-        timeline: timelineModel || null,
-        metadata: {
-          created: new Date().toISOString(),
-          description: `Custom preset with animation: ${presetName}`,
-          hasTimeline: !!timelineModel,
-          timelineKeyframes: timelineModel?.rows ? timelineModel.rows.reduce((count, row) => count + (row.keyframes?.length || 0), 0) : 0
-        }
-      };
-      
-      fileManager.saveJSON(presetData, `preset-${presetName.toLowerCase().replace(/\s+/g, '-')}.json`);
-      console.log('🎛️ Preset saved with timeline:', presetName, {
-        vfxSettings: !!presetData.settings,
-        timeline: !!presetData.timeline,
-        keyframes: presetData.metadata.timelineKeyframes
-      });
+    'Save Current as Preset': button(saveCurrentAsPreset),
+    'Load Preset File': button(() => {
+      if (presetFileInputRef.current) presetFileInputRef.current.click();
     })
   }));
 
@@ -787,11 +764,46 @@ const TimelineController = () => {
         
       } else if (data.settings) {
         console.log('📁 Processing preset file...');
+        console.log('📁 Preset name:', data.name || 'Unknown');
+        console.log('📁 Has timeline:', !!data.timeline);
+        console.log('📁 Metadata:', data.metadata);
+        
+        // Apply VFX settings
         if (updateVfxSettings && data.settings) {
           updateVfxSettings(data.settings);
-          console.log('✅ Preset applied:', data.name || 'Unknown');
+          
+          // Also update local Leva controls (excluding transform parameters)
+          const filteredSettings = {};
+          const excludedKeys = ['positionX', 'positionY', 'positionZ', 'rotationX', 'rotationY', 'rotationZ', 'scale', 'trigger'];
+          
+          Object.keys(data.settings).forEach(key => {
+            if (!excludedKeys.includes(key)) {
+              filteredSettings[key] = data.settings[key];
+            }
+          });
+          
+          try {
+            setAllVfxControls(filteredSettings);
+            console.log('✅ Preset VFX settings applied:', Object.keys(data.settings).length, 'parameters');
+          } catch (error) {
+            console.error('❌ Failed to update Leva controls:', error);
+          }
         }
-        alert(`✅ Preset "${data.name || 'Custom'}" applied successfully!\n• File: ${file.name}`);
+        
+        // Apply timeline data if available
+        if (data.timeline && timeline && timeline.setModel) {
+          console.log('🔄 Applying timeline data from preset...');
+          try {
+            timeline.setModel(data.timeline);
+            console.log('✅ Timeline data applied successfully');
+          } catch (error) {
+            console.error('❌ Failed to apply timeline data:', error);
+          }
+        }
+        
+        const hasTimeline = !!data.timeline;
+        const keyframeCount = data.metadata?.timelineKeyframes || 0;
+        alert(`✅ Preset "${data.name || 'Custom'}" applied successfully!\n• VFX Settings: Yes\n• Timeline: ${hasTimeline ? 'Yes' : 'No'}\n• Keyframes: ${keyframeCount}\n• File: ${file.name}`);
         
       } else {
         console.warn('⚠️ Unknown file format detected!');
@@ -884,6 +896,102 @@ const TimelineController = () => {
     e.target.value = '';
   };
 
+  // ✅ NEW: Enhanced preset import handler with VFX and timeline support
+  const handlePresetImport = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    
+    console.log('🎛️ Starting preset import process...');
+    console.log('📁 File details:', {
+      name: file.name,
+      size: `${(file.size / 1024).toFixed(1)} KB`,
+      type: file.type,
+      lastModified: new Date(file.lastModified).toISOString()
+    });
+    
+    fileManager.loadJSON(file, (data) => {
+      console.log('🎛️ Preset import - raw data:', data);
+      console.log('🎛️ Available keys:', Object.keys(data));
+      
+      // Check if this is a preset file format
+      if (data.name && data.settings) {
+        console.log('🎛️ Processing preset file format...');
+        console.log('🎛️ Preset name:', data.name);
+        console.log('🎛️ Has VFX settings:', !!data.settings);
+        console.log('🎛️ Has timeline:', !!data.timeline);
+        console.log('🎛️ Metadata:', data.metadata);
+        
+        // Apply VFX settings if available
+        if (data.settings && updateVfxSettings) {
+          console.log('🔄 Applying VFX settings from preset...');
+          updateVfxSettings(data.settings);
+          
+          // Also update local Leva controls (excluding transform parameters)
+          const filteredSettings = {};
+          const excludedKeys = ['positionX', 'positionY', 'positionZ', 'rotationX', 'rotationY', 'rotationZ', 'scale', 'trigger'];
+          
+          Object.keys(data.settings).forEach(key => {
+            if (!excludedKeys.includes(key)) {
+              filteredSettings[key] = data.settings[key];
+            }
+          });
+          
+          try {
+            setAllVfxControls(filteredSettings);
+            console.log('✅ VFX settings applied:', Object.keys(data.settings).length, 'parameters');
+          } catch (error) {
+            console.error('❌ Failed to update Leva controls:', error);
+          }
+        } else {
+          console.warn('⚠️ No VFX settings found in preset or updateVfxSettings not available');
+        }
+        
+        // Apply timeline data if available
+        if (data.timeline && timelineRef.current) {
+          const timeline = timelineRef.current.getTimeline?.();
+          if (timeline && timeline.setModel) {
+            console.log('🔄 Applying timeline data from preset...');
+            try {
+              timeline.setModel(data.timeline);
+              console.log('✅ Timeline data applied successfully');
+            } catch (error) {
+              console.error('❌ Failed to apply timeline data:', error);
+            }
+          } else {
+            console.warn('⚠️ Timeline not ready for data import');
+          }
+        } else if (data.timeline) {
+          console.warn('⚠️ Timeline data found but timeline ref not available');
+        } else {
+          console.log('ℹ️ No timeline data in preset (settings-only preset)');
+        }
+        
+        // Show success message
+        const hasSettings = !!data.settings;
+        const hasTimeline = !!data.timeline;
+        const keyframeCount = data.metadata?.timelineKeyframes || 0;
+        
+        alert(`✅ Preset "${data.name}" loaded successfully!\n• VFX Settings: ${hasSettings ? 'Yes' : 'No'}\n• Timeline: ${hasTimeline ? 'Yes' : 'No'}\n• Keyframes: ${keyframeCount}\n• File: ${file.name}`);
+        
+        // Trigger a brief animation to show the loaded effect
+        setTimeout(() => {
+          console.log('🎬 Triggering preview animation...');
+          setIsTimelinePlaying(true);
+          setTimeout(() => setIsTimelinePlaying(false), (data.settings?.duration || 3.0) * 1000);
+        }, 100);
+        
+      } else {
+        console.warn('⚠️ Not a valid preset file format!');
+        console.log('🎛️ Expected: {name, settings, timeline?, metadata?}');
+        console.log('🎛️ Found keys:', Object.keys(data));
+        alert(`⚠️ Invalid preset file format in ${file.name}.\n\nExpected format:\n• name: string\n• settings: object\n• timeline: object (optional)\n• metadata: object (optional)\n\nFound: ${Object.keys(data).join(', ')}`);
+      }
+    });
+    
+    // Reset file input
+    e.target.value = '';
+  };
+
   // Canvas styles
   useEffect(() => {
     const style = document.createElement('style');
@@ -917,6 +1025,14 @@ const TimelineController = () => {
         accept="application/json"
         style={{ display: 'none' }}
         onChange={handleVfxOnlyImport}
+      />
+      
+      <input
+        ref={presetFileInputRef}
+        type="file"
+        accept="application/json"
+        style={{ display: 'none' }}
+        onChange={handlePresetImport}
       />
       
       <Canvas
