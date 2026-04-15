@@ -274,6 +274,6 @@ For questions or issues, please open a GitHub issue.
 ---
 
 <div align="center">
-  <img src="public/ROFL_logo.png" alt="ROFL Production Logo" width="200"/>
+  <img src="asset/ROFL_logo.png" alt="ROFL Production Logo" width="200"/>
   <p><strong>A ROFL Production</strong></p>
 </div>
