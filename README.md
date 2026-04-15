@@ -270,3 +270,10 @@ Contributions are welcome! Please open an issue or submit a pull request.
 ## Support
 
 For questions or issues, please open a GitHub issue.
+
+---
+
+<div align="center">
+  <img src="public/ROFL_logo.png" alt="ROFL Production Logo" width="200"/>
+  <p><strong>A ROFL Production</strong></p>
+</div>
