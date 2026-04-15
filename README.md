@@ -274,6 +274,6 @@ For questions or issues, please open a GitHub issue.
 ---
 
 <div align="center">
-  <img src="https://raw.githubusercontent.com/moykul/vfxEngine/main/public/assets/roflStamp.jpg" alt="ROFL Production Logo" width="200"/>
+  <img src="https://raw.githubusercontent.com/moykul/vfxEngine/main/public/assets/roflStamp.png" alt="ROFL Production Logo" width="200"/>
   <p><strong>A ROFL Production</strong></p>
 </div>
