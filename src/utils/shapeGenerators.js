@@ -254,9 +254,30 @@ export const generateGLB = async (count, glbPath, radius = 1, heightMultiplier =
     
   } catch (error) {
     console.error('Failed to generate GLB positions:', error);
-    // Fallback to explosion pattern
-    return generateExplosion(count, radius);
+    // Fallback to ring pattern
+    return generateRing(count, radius);
   }
+};
+
+/**
+ * Generate particle positions for ring pattern (radial burst parallel to ground)
+ */
+export const generateRing = (count, radius, minRadius = null) => {
+  const positions = new Float32Array(count * 3);
+  const actualMinRadius = minRadius || radius * 0.7;
+  
+  for (let i = 0; i < count; i++) {
+    const i3 = i * 3;
+    
+    const angle = Math.random() * Math.PI * 2;
+    const distance = actualMinRadius + Math.random() * (radius - actualMinRadius);
+    
+    positions[i3] = Math.cos(angle) * distance;     // x
+    positions[i3 + 1] = 0;                          // y (ground level)
+    positions[i3 + 2] = Math.sin(angle) * distance; // z
+  }
+  
+  return positions;
 };
 
 /**
@@ -657,8 +678,9 @@ export const generatePositions = async (shape, count, radius, height = 2, angle 
     case 'model':
       // Handle GLB asynchronously
       return await generateGLB(count, glbPath, radius, heightMultiplier, options);
-    case 'explosion':
-      return generateExplosion(count, radius, options.minRadius);
+    case 'ring':
+    case 'explosion': // Keep for backward compatibility
+      return generateRing(count, radius, options.minRadius);
     case 'sphere':
       return generateSphere(count, radius, heightMultiplier, hollow);
     case 'box':
@@ -674,8 +696,8 @@ export const generatePositions = async (shape, count, radius, height = 2, angle 
     case 'wave':
       return generateWave(count, radius, height, angle, heightMultiplier, frequency, amplitude);
     default:
-      console.warn(`Unknown shape: ${shape}, falling back to explosion`);
-      return generateExplosion(count, radius);
+      console.warn(`Unknown shape: ${shape}, falling back to ring`);
+      return generateRing(count, radius);
   }
 };
 
@@ -684,8 +706,8 @@ export const generatePositions = async (shape, count, radius, height = 2, angle 
  */
 export const generatePositionsSync = (shape, count, radius, height = 2, angle = 0, heightMultiplier = 1, options = {}) => {
   if (shape === 'glb' || shape === 'model') {
-    console.warn('GLB shapes require async loading, falling back to explosion');
-    return generateExplosion(count, radius);
+    console.warn('GLB shapes require async loading, falling back to ring');
+    return generateRing(count, radius);
   }
   
   // Remove async/await and call generatePositions normally
@@ -697,7 +719,7 @@ export const generatePositionsSync = (shape, count, radius, height = 2, angle = 
  */
 export const getAvailableShapes = () => {
   return [
-    'explosion', 'sphere', 'box', 'cone', 'circle', 
+    'ring', 'sphere', 'box', 'cone', 'circle', 
     'square', 'spiral', 'wave', 'glb', 'model', 'tornado'
   ];
 };
@@ -724,7 +746,7 @@ export default {
   generatePositionsSync,
   generateGLB,
   generateTornado,
-  generateExplosion,
+  generateRing,
   generateSphere,
   generateBox,
   generateCone,
