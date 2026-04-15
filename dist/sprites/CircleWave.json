@@ -1,0 +1,129 @@
+{"frames": [
+
+{
+	"filename": "SpritesCircleWave0001.png",
+	"frame": {"x":1,"y":1,"w":480,"h":300},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":480,"h":300},
+	"sourceSize": {"w":480,"h":300},
+	"pivot": {"x":0.5,"y":0.5}
+},
+{
+	"filename": "SpritesCircleWave0002.png",
+	"frame": {"x":483,"y":1,"w":480,"h":300},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":480,"h":300},
+	"sourceSize": {"w":480,"h":300},
+	"pivot": {"x":0.5,"y":0.5}
+},
+{
+	"filename": "SpritesCircleWave0003.png",
+	"frame": {"x":965,"y":1,"w":480,"h":300},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":480,"h":300},
+	"sourceSize": {"w":480,"h":300},
+	"pivot": {"x":0.5,"y":0.5}
+},
+{
+	"filename": "SpritesCircleWave0004.png",
+	"frame": {"x":1447,"y":1,"w":480,"h":300},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":480,"h":300},
+	"sourceSize": {"w":480,"h":300},
+	"pivot": {"x":0.5,"y":0.5}
+},
+{
+	"filename": "SpritesCircleWave0005.png",
+	"frame": {"x":1,"y":303,"w":480,"h":300},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":480,"h":300},
+	"sourceSize": {"w":480,"h":300},
+	"pivot": {"x":0.5,"y":0.5}
+},
+{
+	"filename": "SpritesCircleWave0006.png",
+	"frame": {"x":483,"y":303,"w":480,"h":300},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":480,"h":300},
+	"sourceSize": {"w":480,"h":300},
+	"pivot": {"x":0.5,"y":0.5}
+},
+{
+	"filename": "SpritesCircleWave0007.png",
+	"frame": {"x":965,"y":303,"w":480,"h":300},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":480,"h":300},
+	"sourceSize": {"w":480,"h":300},
+	"pivot": {"x":0.5,"y":0.5}
+},
+{
+	"filename": "SpritesCircleWave0008.png",
+	"frame": {"x":1447,"y":303,"w":480,"h":300},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":480,"h":300},
+	"sourceSize": {"w":480,"h":300},
+	"pivot": {"x":0.5,"y":0.5}
+},
+{
+	"filename": "SpritesCircleWave0009.png",
+	"frame": {"x":1,"y":605,"w":480,"h":300},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":480,"h":300},
+	"sourceSize": {"w":480,"h":300},
+	"pivot": {"x":0.5,"y":0.5}
+},
+{
+	"filename": "SpritesCircleWave0010.png",
+	"frame": {"x":483,"y":605,"w":480,"h":300},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":480,"h":300},
+	"sourceSize": {"w":480,"h":300},
+	"pivot": {"x":0.5,"y":0.5}
+},
+{
+	"filename": "SpritesCircleWave0011.png",
+	"frame": {"x":965,"y":605,"w":480,"h":300},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":480,"h":300},
+	"sourceSize": {"w":480,"h":300},
+	"pivot": {"x":0.5,"y":0.5}
+},
+{
+	"filename": "SpritesCircleWave0012.png",
+	"frame": {"x":1447,"y":605,"w":480,"h":300},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":480,"h":300},
+	"sourceSize": {"w":480,"h":300},
+	"pivot": {"x":0.5,"y":0.5}
+},
+{
+	"filename": "SpritesCircleWave0013.png",
+	"frame": {"x":1,"y":907,"w":480,"h":300},
+	"rotated": false,
+	"trimmed": false,
+	"spriteSourceSize": {"x":0,"y":0,"w":480,"h":300},
+	"sourceSize": {"w":480,"h":300},
+	"pivot": {"x":0.5,"y":0.5}
+}],
+"meta": {
+	"app": "https://www.codeandweb.com/texturepacker",
+	"version": "1.0",
+	"image": "CircleWave.png",
+	"format": "RGBA8888",
+	"size": {"w":1928,"h":1208},
+	"scale": "1",
+	"smartupdate": "$TexturePacker:SmartUpdate:26567be09ee33c6d9d94ef89b4e68f5b:77d53eaf8d8f471d71cb28bde5a50988:772e94fdf5c94216aeaa9003095f7068$"
+}
+}
